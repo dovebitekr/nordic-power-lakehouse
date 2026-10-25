@@ -13,6 +13,7 @@ if not API_KEY:
 DATASETS = {
     "wind_generation": 75,
     "nuclear_generation": 188,
+    "solar_generation": 248,
     "hydro_generation": 191,
     "total_consumption": 124
 }
