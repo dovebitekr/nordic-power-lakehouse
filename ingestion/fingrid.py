@@ -11,11 +11,10 @@ if not API_KEY:
     raise ValueError("FINGRID_API_KEY is not configured in the .env file")
 
 DATASETS = {
-    "wind_generation": 75,
-    "nuclear_generation": 188,
-    "solar_generation": 248,
-    "hydro_generation": 191,
-    "total_consumption": 124
+    "wind_generation": 75, #interval:15 min
+    "nuclear_generation": 188, #interval:3 min
+    "hydro_generation": 191, #interval:3 min
+    "total_consumption": 124 #electricity consumption in Finland - 15 min
 }
 HEADERS = {
     "x-api-key": API_KEY,
@@ -26,7 +25,7 @@ params = {
     "startTime": "2026-10-22T00:00:00.000Z",
     "endTime": "2026-10-25T00:00:00.000Z",
     "format": "json",
-    "pageSize": 300
+    "pageSize": 2000 #to ensure 3 mins interval data (hydro, nuclear)
 }
 
 OUTPUT_DIR = Path("data/bronze/fingrid")
