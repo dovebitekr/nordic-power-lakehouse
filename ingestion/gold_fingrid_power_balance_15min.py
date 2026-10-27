@@ -79,9 +79,9 @@ dfs = {
 
 joined_df = (
     dfs["wind"]
-    .join(dfs["nuclear"], on="start_time_utc", how="inner")
-    .join(dfs["hydro"], on="start_time_utc", how="inner")
-    .join(dfs["total_consumption"], on="start_time_utc", how="inner")
+    .join(dfs["nuclear"], on="start_time_utc", how="left")
+    .join(dfs["hydro"], on="start_time_utc", how="left")
+    .join(dfs["total_consumption"], on="start_time_utc", how="left")
     .withColumn("selected_generation_mw", F.round(F.col("wind_mw") + F.col("nuclear_mw") + F.col("hydro_mw"), 3))
     .withColumn("net_load_ex_solar_mw", F.round(F.col("consumption_mw") - F.col("wind_mw"), 3))
     .withColumn("selected_gen_balance_mw", F.round(F.col("selected_generation_mw") - F.col("consumption_mw"), 3))
