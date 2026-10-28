@@ -1,4 +1,3 @@
-
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 from pathlib import Path
@@ -38,6 +37,12 @@ silver_tasks = [
         "energy_name": "total_consumption",
         "path": BASE_DIR / "data/silver/fingrid/total_consumption",
         "value_col": "consumption_mw",
+        "is_base": False
+    },
+    {
+        "energy_name" : "price",
+        "path": BASE_DIR / "data/silver/entsoe/day_ahead_price",
+        "value_col": "price_eur_per_mwh",
         "is_base": False
     }
 ]
@@ -82,6 +87,7 @@ joined_df = (
     .join(dfs["nuclear"], on="start_time_utc", how="left")
     .join(dfs["hydro"], on="start_time_utc", how="left")
     .join(dfs["total_consumption"], on="start_time_utc", how="left")
+    .join(dfs["price"], on="start_time_utc", how="left")
     .withColumn("selected_generation_mw", F.round(F.col("wind_mw") + F.col("nuclear_mw") + F.col("hydro_mw"), 3))
     .withColumn("net_load_ex_solar_mw", F.round(F.col("consumption_mw") - F.col("wind_mw"), 3))
     .withColumn("selected_gen_balance_mw", F.round(F.col("selected_generation_mw") - F.col("consumption_mw"), 3))
@@ -90,8 +96,7 @@ joined_df = (
     .orderBy(F.col("start_time_utc").asc())
 )
 
-
-outdir = str(BASE_DIR / "data/gold/fingrid/power_balance_15min")
+outdir = str(BASE_DIR / "data/gold/power_market_15min")
 joined_df.write.mode("overwrite").format("parquet").save(outdir)
 
 

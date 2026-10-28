@@ -53,3 +53,6 @@ for metric_name, dataset_id in DATASETS.items():
     #Throttle requests to respect FINGRID API rate limits (min 2.0s gap)
     time.sleep(2.5)
 print("\nIngestion pipeline execution completed.")
+
+fingrid_wind = spark.read.parquet(str(BASE_DIR / "data/silver/fingrid/wind_generation"))
+fingrid_wind.select("start_time_utc", "start_time_helsinki").orderBy("start_time_utc").show(5, truncate=False)
