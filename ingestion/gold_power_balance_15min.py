@@ -92,13 +92,17 @@ joined_df = (
     .withColumn("net_load_ex_solar_mw", F.round(F.col("consumption_mw") - F.col("wind_mw"), 3))
     .withColumn("selected_gen_balance_mw", F.round(F.col("selected_generation_mw") - F.col("consumption_mw"), 3))
     .withColumn("wind_share_selected_ratio", F.when(F.col("selected_generation_mw") > 0, F.round((F.col("wind_mw")/F.col("selected_generation_mw")), 3)).otherwise(0.0))
+    .withColumn("year", F.year(F.col("start_time_helsinki")))
+    .withColumn("month", F.month(F.col("start_time_helsinki")))
     # Order by start_time_utc since it is a time series dataset
     .orderBy(F.col("start_time_utc").asc())
 )
 
 outdir = str(BASE_DIR / "data/gold/power_market_15min")
-joined_df.write.mode("overwrite").format("parquet").save(outdir)
+joined_df.write.mode("overwrite").partitionBy("year").format("parquet").save(outdir)
 
+print(f"✔ Successfully saved Gold dataset to: {outdir}")
+print(f"✔ Total Gold rows: {joined_df.count():,} records")
 
 
 

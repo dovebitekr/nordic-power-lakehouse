@@ -64,6 +64,8 @@ def process_fingrid_bronze_to_silver(
         .withColumn("end_time_helsinki", F.from_utc_timestamp(F.col("end_time_utc"), "Europe/Helsinki"))
         # Extra time features for partitioning & analysis
         .withColumn("date_start_helsinki", F.to_date(F.col("start_time_helsinki")))
+        .withColumn("year", F.year(F.col("start_time_helsinki")))
+        .withColumn("month", F.month(F.col("start_time_helsinki")))
         .withColumn("hour_start_helsinki", F.hour(F.col("start_time_helsinki")))
         .withColumn("minute_start_helsinki", F.minute(F.col("start_time_helsinki")))
         # Day of week and weekend flag (1: Sun, 7: Sat)
@@ -97,33 +99,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 pipeline_tasks = [
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/wind_generation_sample.json"),
+        "path": str(BASE_DIR / "data/bronze/fingrid/wind_generation_*.json"),
         "col": "wind_mw",
         "is_gen": True,
         "resample": False,
-        "out": str(BASE_DIR / "data/silver/fingrid/wind_generation")
+        "out": str(BASE_DIR / "data/silver/fingrid/wind_generation"),
     },
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/nuclear_generation_sample.json"),
+        "path": str(BASE_DIR / "data/bronze/fingrid/nuclear_generation_*.json"),
         "col": "nuclear_mw",
         "is_gen": True,
         "resample": True,
-        "out": str(BASE_DIR / "data/silver/fingrid/nuclear_generation")
+        "out": str(BASE_DIR / "data/silver/fingrid/nuclear_generation"),
     },
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/hydro_generation_sample.json"),
+        "path": str(BASE_DIR / "data/bronze/fingrid/hydro_generation_*.json"),
         "col": "hydro_mw",
         "is_gen": True,
         "resample": True,
-        "out": str(BASE_DIR / "data/silver/fingrid/hydro_generation")
+        "out": str(BASE_DIR / "data/silver/fingrid/hydro_generation"),
     },
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/total_consumption_sample.json"),
+        "path": str(BASE_DIR / "data/bronze/fingrid/total_consumption_*.json"),
         "col": "consumption_mw",
         "is_gen": False,
         "resample": False,
-        "out": str(BASE_DIR / "data/silver/fingrid/total_consumption")
-    }
+        "out": str(BASE_DIR / "data/silver/fingrid/total_consumption"),
+    },
 ]
 
 # Run pipeline
@@ -139,10 +141,10 @@ for task in pipeline_tasks:
     )
     
     row_count = df.count()
-    print(f" -> {task['col']} count: {row_count} / 288")
+    print(f" -> {task['col']} count: {row_count} records.")
     
     # Save to Parquet
-    df.write.mode("overwrite").format("parquet").save(task["out"])
+    df.write.mode("overwrite").partitionBy("year").format("parquet").save(task["out"])
 
 print("All Silver datasets successfully processed and saved.")
 

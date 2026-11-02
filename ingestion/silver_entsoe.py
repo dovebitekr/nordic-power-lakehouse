@@ -89,6 +89,8 @@ price_df = (
         "start_time_helsinki",
         F.from_utc_timestamp(F.col("start_time_utc"), "Europe/Helsinki")
     )
+    .withColumn("year", F.year(F.col("start_time_helsinki")))
+    .withColumn("month", F.month(F.col("start_time_helsinki")))
     .orderBy("start_time_utc")
 )
 
@@ -113,5 +115,5 @@ price_df.select(
 
 # Save to Silver Parquet
 silver_out = str(BASE_DIR / "data/silver/entsoe/day_ahead_price")
-price_df.write.mode("overwrite").format("parquet").save(silver_out)
+price_df.write.mode("overwrite").partitionBy("year").format("parquet").save(silver_out)
 print(f"Successfully saved Silver price table to: {silver_out}")
