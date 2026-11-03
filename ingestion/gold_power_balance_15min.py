@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 from pathlib import Path
+from pyspark.sql.window import Window
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 spark = (
@@ -8,6 +9,7 @@ spark = (
     .appName("Nordic-Power-Lakehouse-Gold_power_balance_15min")
     .master("local[*]")
     .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.driver.host", "127.0.0.1")
     .config("spark.driver.memory", "4g")
     .config("spark.sql.session.timeZone", "UTC")
     .getOrCreate()
@@ -88,6 +90,12 @@ joined_df = (
     .join(dfs["hydro"], on="start_time_utc", how="left")
     .join(dfs["total_consumption"], on="start_time_utc", how="left")
     .join(dfs["price"], on="start_time_utc", how="left")
+    .withColumn(
+        "consumption_mw",
+        F.last("consumption_mw", ignorenulls=True).over(
+            Window.orderBy("start_time_utc").rowsBetween(Window.unboundedPreceding, 0)
+        ),
+    ) # Fill missing consumption values with the last known value
     .withColumn("selected_generation_mw", F.round(F.col("wind_mw") + F.col("nuclear_mw") + F.col("hydro_mw"), 3))
     .withColumn("net_load_ex_solar_mw", F.round(F.col("consumption_mw") - F.col("wind_mw"), 3))
     .withColumn("selected_gen_balance_mw", F.round(F.col("selected_generation_mw") - F.col("consumption_mw"), 3))
