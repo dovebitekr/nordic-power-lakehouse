@@ -1,6 +1,18 @@
+import logging
+import os
+from pathlib import Path
+import sys
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
-from pathlib import Path
+
+os.environ["PYSPARK_PYTHON"] = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(filename)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 # Initialize SparkSession
 spark = (
@@ -8,6 +20,7 @@ spark = (
     .appName("Nordic-Power-Lakehouse-Silver")
     .master("local[*]")
     .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.driver.host", "127.0.0.1")
     .config("spark.driver.memory", "4g")
     .config("spark.sql.session.timeZone", "UTC")
     .getOrCreate()
@@ -21,7 +34,7 @@ def process_fingrid_bronze_to_silver(
     resample_15min: bool = False
 ):
     """
-    Parse Bronze JSON, standardize timestamps, downsample 3-min to 15-min if needed,
+    Parse Bronze JSON, standardize timestamps, downsample intervals if needed,
     clamp negative generation values, and return Silver DataFrame.
     """
     # Read JSON and explode data array
@@ -36,7 +49,7 @@ def process_fingrid_bronze_to_silver(
         )
     )
     
-    # Resample 3-min data (Nuclear, Hydro) or keep 15-min data (Wind, Consumption)
+    # Resample high frequency data or keep standard interval data
     if resample_15min:
         standardized_df = (
             raw_df
@@ -62,24 +75,27 @@ def process_fingrid_bronze_to_silver(
         standardized_df
         .withColumn("start_time_helsinki", F.from_utc_timestamp(F.col("start_time_utc"), "Europe/Helsinki"))
         .withColumn("end_time_helsinki", F.from_utc_timestamp(F.col("end_time_utc"), "Europe/Helsinki"))
-        # Extra time features for partitioning & analysis
+        # Extra time features for partitioning and analysis
         .withColumn("date_start_helsinki", F.to_date(F.col("start_time_helsinki")))
         .withColumn("year", F.year(F.col("start_time_helsinki")))
         .withColumn("month", F.month(F.col("start_time_helsinki")))
         .withColumn("hour_start_helsinki", F.hour(F.col("start_time_helsinki")))
         .withColumn("minute_start_helsinki", F.minute(F.col("start_time_helsinki")))
-        # Day of week and weekend flag (1: Sun, 7: Sat)
+        # Day of week and weekend flag
         .withColumn("day_of_week", F.dayofweek(F.col("start_time_helsinki")))
         .withColumn("is_weekend", F.when(F.col("day_of_week").isin([1, 7]), True).otherwise(False))
-        # Peak-hour flag (07:00 - 20:00)
+        # Peak hour flag
         .withColumn(
             "is_peak_hour",
-            F.when((F.col("hour_start_helsinki") >= 7) & (F.col("hour_start_helsinki") < 20), True).otherwise(False)
+            (~F.col("is_weekend")) & (F.col("hour_start_helsinki") >= 8) & (F.col("hour_start_helsinki") < 20)
         )
     )
 
     # Clamp negative generation values to zero
     if is_generation:
+        neg_count = standardized_df.filter(F.col(value_col_name) < 0).count()
+        if neg_count > 0:
+            logging.info("Clamped %s negative generation records to zero for %s", neg_count, value_col_name)
         cleaned_df = standardized_df.withColumn(
             value_col_name,
             F.when(F.col(value_col_name) < 0, 0.0).otherwise(F.col(value_col_name))
@@ -94,33 +110,34 @@ def process_fingrid_bronze_to_silver(
         .orderBy(F.col("start_time_utc").asc())
     )
 
-# Task configuration for 4 core metrics
+# Task configuration for core metrics
 BASE_DIR = Path(__file__).resolve().parent.parent
+bronze_dir = BASE_DIR / "data/bronze/fingrid"
 
 pipeline_tasks = [
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/wind_generation_*.json"),
+        "pattern": "wind_generation_*.json",
         "col": "wind_mw",
         "is_gen": True,
         "resample": False,
         "out": str(BASE_DIR / "data/silver/fingrid/wind_generation"),
     },
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/nuclear_generation_*.json"),
+        "pattern": "nuclear_generation_*.json",
         "col": "nuclear_mw",
         "is_gen": True,
         "resample": True,
         "out": str(BASE_DIR / "data/silver/fingrid/nuclear_generation"),
     },
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/hydro_generation_*.json"),
+        "pattern": "hydro_generation_*.json",
         "col": "hydro_mw",
         "is_gen": True,
         "resample": True,
         "out": str(BASE_DIR / "data/silver/fingrid/hydro_generation"),
     },
     {
-        "path": str(BASE_DIR / "data/bronze/fingrid/total_consumption_*.json"),
+        "pattern": "total_consumption_*.json",
         "col": "consumption_mw",
         "is_gen": False,
         "resample": False,
@@ -130,21 +147,29 @@ pipeline_tasks = [
 
 # Run pipeline
 for task in pipeline_tasks:
-    print(f"Processing: {task['col']}...")
+    matched_files = sorted(bronze_dir.glob(task["pattern"]))
+    if not matched_files:
+        logging.error("No bronze files found for %s matching %s", task["col"], task["pattern"])
+        sys.exit(1)
+
+    logging.info("Processing metric: %s (%s bronze files)", task["col"], len(matched_files))
     
     df = process_fingrid_bronze_to_silver(
         spark=spark,
-        json_path=task["path"],
+        json_path=[str(p) for p in matched_files],
         value_col_name=task["col"],
         is_generation=task["is_gen"],
         resample_15min=task["resample"]
     )
     
     row_count = df.count()
-    print(f" -> {task['col']} count: {row_count} records.")
+    if row_count == 0:
+        logging.error("Transformed dataset for %s has zero records", task["col"])
+        sys.exit(1)
+
+    logging.info("Transformed %s with %s records", task["col"], row_count)
     
     # Save to Parquet
-    df.write.mode("overwrite").partitionBy("year").format("parquet").save(task["out"])
+    df.coalesce(1).write.mode("overwrite").partitionBy("year").format("parquet").save(task["out"])
 
-print("All Silver datasets successfully processed and saved.")
-
+logging.info("All silver datasets successfully processed and saved")

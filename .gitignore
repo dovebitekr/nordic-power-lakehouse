@@ -6,3 +6,4 @@ data/
 *.duckdb
 *.parquet
 .DS_Store
+docs/
