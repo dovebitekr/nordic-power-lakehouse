@@ -14,7 +14,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-# Initialize SparkSession
+# Initialise SparkSession
 spark = (
     SparkSession.builder
     .appName("Nordic-Power-Lakehouse-Silver")
@@ -34,7 +34,7 @@ def process_fingrid_bronze_to_silver(
     resample_15min: bool = False
 ):
     """
-    Parse Bronze JSON, standardize timestamps, downsample intervals if needed,
+    Parse Bronze JSON, standardise timestamps, downsample intervals if needed,
     clamp negative generation values, and return Silver DataFrame.
     """
     # Read JSON and explode data array
@@ -44,64 +44,47 @@ def process_fingrid_bronze_to_silver(
         .select(F.explode(F.col("data")).alias("record"))
         .select(
             F.col("record.startTime").alias("startTime"),
-            F.col("record.endTime").alias("endTime"),
             F.col("record.value").cast("double").alias(value_col_name)
         )
     )
     
     # Resample high frequency data or keep standard interval data
     if resample_15min:
-        standardized_df = (
+        standardised_df = (
             raw_df
             .withColumn("timestamp_utc", F.to_timestamp(F.col("startTime")))
             .groupBy(F.window(F.col("timestamp_utc"), "15 minutes").alias("time_window"))
             .agg(F.round(F.avg(value_col_name), 2).alias(value_col_name))
             .select(
                 F.col("time_window.start").alias("start_time_utc"),
-                F.col("time_window.end").alias("end_time_utc"),
                 F.col(value_col_name)
             )
         )
     else:
-        standardized_df = (
+        standardised_df = (
             raw_df
             .withColumn("start_time_utc", F.to_timestamp(F.col("startTime")))
-            .withColumn("end_time_utc", F.to_timestamp(F.col("endTime")))
-            .select("start_time_utc", "end_time_utc", value_col_name)
+            .select("start_time_utc", value_col_name)
         )
-        
-    # Add local Helsinki timestamps and calendar features
-    standardized_df = (
-        standardized_df
+
+    # Add local Helsinki timestamp and partition year
+    standardised_df = (
+        standardised_df
         .withColumn("start_time_helsinki", F.from_utc_timestamp(F.col("start_time_utc"), "Europe/Helsinki"))
-        .withColumn("end_time_helsinki", F.from_utc_timestamp(F.col("end_time_utc"), "Europe/Helsinki"))
-        # Extra time features for partitioning and analysis
-        .withColumn("date_start_helsinki", F.to_date(F.col("start_time_helsinki")))
         .withColumn("year", F.year(F.col("start_time_helsinki")))
-        .withColumn("month", F.month(F.col("start_time_helsinki")))
-        .withColumn("hour_start_helsinki", F.hour(F.col("start_time_helsinki")))
-        .withColumn("minute_start_helsinki", F.minute(F.col("start_time_helsinki")))
-        # Day of week and weekend flag
-        .withColumn("day_of_week", F.dayofweek(F.col("start_time_helsinki")))
-        .withColumn("is_weekend", F.when(F.col("day_of_week").isin([1, 7]), True).otherwise(False))
-        # Peak hour flag
-        .withColumn(
-            "is_peak_hour",
-            (~F.col("is_weekend")) & (F.col("hour_start_helsinki") >= 8) & (F.col("hour_start_helsinki") < 20)
-        )
     )
 
     # Clamp negative generation values to zero
     if is_generation:
-        neg_count = standardized_df.filter(F.col(value_col_name) < 0).count()
+        neg_count = standardised_df.filter(F.col(value_col_name) < 0).count()
         if neg_count > 0:
             logging.info("Clamped %s negative generation records to zero for %s", neg_count, value_col_name)
-        cleaned_df = standardized_df.withColumn(
+        cleaned_df = standardised_df.withColumn(
             value_col_name,
             F.when(F.col(value_col_name) < 0, 0.0).otherwise(F.col(value_col_name))
         )
     else:
-        cleaned_df = standardized_df
+        cleaned_df = standardised_df
 
     # Remove duplicates and sort by timestamp
     return (

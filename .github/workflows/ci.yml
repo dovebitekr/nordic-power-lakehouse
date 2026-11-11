@@ -1,0 +1,34 @@
+name: Data Pipeline CI
+# Run this check whenever code is pushed or a pull request is opened
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+jobs:
+  validate-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      # Download repository code onto the runner
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      # Install Python on the runner
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Install testing dependencies
+      - name: Install dependencies
+        run: pip install pandas pyarrow numpy pytest
+      # Check bash script syntax without executing it
+      - name: Validate shell script syntax
+        run: bash -n run_pipeline.sh
+      # Check Python syntax across all pipeline scripts and DAGs
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile ingestion/*.py
+          python -m py_compile dags/*.py
+          python -m py_compile tests/*.py
+      # Run data quality test suite against fixture data
+      - name: Run pytest suite
+        run: pytest -v tests/test_gold_integrity.py

@@ -46,6 +46,11 @@ parser.add_argument(
     default="2026-11-01",
     help="End date in YYYY-MM-DD format",
 )
+parser.add_argument(
+    "--overwrite",
+    action="store_true",
+    help="Re-download files even if they already exist locally",
+)
 args = parser.parse_args()
 
 OUTPUT_DIR = BASE_DIR / "data/bronze/fingrid"
@@ -71,6 +76,11 @@ while current_start < global_end:
     }
 
     for metric_name, dataset_id in DATASETS.items():
+        file_path = OUTPUT_DIR / f"{metric_name}_{start_str}_{end_str}.json"
+        if file_path.exists() and file_path.stat().st_size > 0 and not args.overwrite:
+            logging.info("Skipping existing file: %s", file_path.name)
+            continue
+
         logging.info("Fetching metric: %s with id: %s", metric_name, dataset_id)
         endpoint_url = f"https://data.fingrid.fi/api/datasets/{dataset_id}/data"
         response = None
@@ -94,7 +104,6 @@ while current_start < global_end:
                 failed_requests += 1
             else:
                 logging.info("Received %s of %s records for %s", record_count, total_count, metric_name)
-                file_path = OUTPUT_DIR / f"{metric_name}_{start_str}_{end_str}.json"
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(payload, f, indent=2)
                 logging.info("Saved payload to %s", file_path.name)

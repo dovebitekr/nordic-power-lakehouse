@@ -26,7 +26,7 @@ args = parser.parse_args()
 # Path configuration
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Initialize spark session
+# Initialise spark session
 spark = (
     SparkSession.builder
     .appName("Nordic-Power-Lakehouse-Gold")
@@ -88,9 +88,7 @@ time_grid = (
     """)
     .withColumn("start_time_helsinki", F.from_utc_timestamp("start_time_utc", "Europe/Helsinki"))
     .withColumn("date_start_helsinki", F.to_date("start_time_helsinki"))
-    .withColumn("minute_start_helsinki", F.minute("start_time_helsinki"))
-    .withColumn("day_of_week", F.dayofweek("start_time_helsinki"))
-    .withColumn("is_weekend", F.col("day_of_week").isin([1, 7]))
+    .withColumn("is_weekend", F.dayofweek("start_time_helsinki").isin([1, 7]))
     .withColumn(
         "is_peak_hour",
         (~F.col("is_weekend")) & (F.hour("start_time_helsinki") >= 8) & (F.hour("start_time_helsinki") < 20)
@@ -131,11 +129,9 @@ gold_df = (
     .withColumn("wind_mw", F.last("wind_mw", ignorenulls=True).over(w))
     .withColumn("consumption_mw", F.last("consumption_mw", ignorenulls=True).over(w))
     .withColumn("selected_generation_mw", F.round(F.col("wind_mw") + F.col("nuclear_mw") + F.col("hydro_mw"), 3))
-    .withColumn("net_load_ex_solar_mw", F.round(F.col("consumption_mw") - F.col("wind_mw"), 3))
     .withColumn("selected_gen_balance_mw", F.round(F.col("selected_generation_mw") - F.col("consumption_mw"), 3))
     .withColumn("wind_share_selected_ratio", F.when(F.col("selected_generation_mw") > 0, F.round((F.col("wind_mw")/F.col("selected_generation_mw")), 3)).otherwise(0.0))
     .withColumn("year", F.year("start_time_helsinki"))
-    .withColumn("month", F.month("start_time_helsinki"))
     .orderBy("start_time_utc")
 )
 

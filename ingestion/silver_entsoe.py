@@ -84,7 +84,7 @@ for xml_file in xml_files:
 
 logging.info("Parsed %s raw intervals (decompressed %s omitted curve positions)", len(all_records), total_curve_fills)
 
-# Create Spark DataFrame and standardize columns
+# Create Spark DataFrame and standardise columns
 spark = (
     SparkSession.builder
     .appName("Silver_ENTSOE_Price")
@@ -108,7 +108,6 @@ price_df = (
         F.from_utc_timestamp(F.col("start_time_utc"), "Europe/Helsinki")
     )
     .withColumn("year", F.year(F.col("start_time_helsinki")))
-    .withColumn("month", F.month(F.col("start_time_helsinki")))
     .orderBy("start_time_utc")
 )
 

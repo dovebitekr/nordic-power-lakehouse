@@ -36,6 +36,11 @@ parser.add_argument(
     default="2026-11-01",
     help="End date in YYYY-MM-DD format",
 )
+parser.add_argument(
+    "--overwrite",
+    action="store_true",
+    help="Re-download files even if they already exist locally",
+)
 args = parser.parse_args()
 
 out_dir = BASE_DIR / "data/bronze/entsoe/day_ahead_prices/FI"
@@ -55,6 +60,14 @@ while current_start < global_end:
     end_str = current_end.strftime("%Y-%m-%d")
     p_start = current_start.strftime("%Y%m%d0000")
     p_end = current_end.strftime("%Y%m%d0000")
+    file_name = f"FI_{p_start}_{p_end}.xml"
+    out_path = out_dir / file_name
+
+    if out_path.exists() and out_path.stat().st_size > 0 and not args.overwrite:
+        logging.info("Skipping existing file: %s", file_name)
+        current_start = current_end
+        continue
+
     logging.info("Processing period: %s to %s", start_str, end_str)
 
     params = {
@@ -88,8 +101,6 @@ while current_start < global_end:
             logging.error("No time series data found for %s to %s: %s", start_str, end_str, msg)
             failed_periods += 1
         else:
-            file_name = f"FI_{p_start}_{p_end}.xml"
-            out_path = out_dir / file_name
             out_path.write_bytes(r.content)
             logging.info("Saved payload to %s", file_name)
     else:
