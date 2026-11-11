@@ -10,12 +10,15 @@ To test whether the final Gold table is directly usable for downstream analysis,
 
 ```mermaid
 flowchart LR
-    A["External APIs\n(Fingrid JSON / ENTSO-E XML)"] --> B["Bronze Layer\n(Raw Monthly Files)"]
-    B --> C["Silver Layer\n(PySpark 15-min Parquet)"]
-    C --> D["Gold Layer\n(15-min Spine Parquet)"]
-    D --> E["Data Quality Audit\n(Pytest 7 Checks)"]
-    E --> F["Serving Database\n(PostgreSQL)"]
+    subgraph Runtime ["Docker Compose Environment & Airflow Orchestration"]
+        A["External APIs\n(Fingrid JSON / ENTSO-E XML)"] --> B["Bronze Layer\n(Raw Monthly Files)"]
+        B --> C["Silver Layer\n(PySpark 15-min Parquet)"]
+        C --> D["Gold Layer\n(15-min Spine Parquet)"]
+        D --> E["Data Quality Audit\n(Pytest 7 Checks)"]
+        E --> F["Serving Database\n(PostgreSQL)"]
+    end
     D --> G["Downstream Analysis\n(BESS Simulation)"]
+    H["GitHub Actions CI\n(Syntax & Pytest)"] -.-> E
 ```
 
 | Layer / Role | Tool | Purpose in This Project |
@@ -24,7 +27,8 @@ flowchart LR
 | **Transformation (Silver & Gold)** | Apache Spark (`PySpark`), Parquet | Standardise timestamps to UTC, align mixed time resolutions to 15 minutes, and join onto a continuous time spine |
 | **Data Quality Audit** | `pytest`, `pandas`, `numpy` | Verify row continuity, DST transitions, physical bounds, and null counts before database loading |
 | **Serving Database** | PostgreSQL (`SQLAlchemy`, `psycopg2`) | Store the verified Gold table (`power_market_15min`) with `start_time_utc` as the primary key |
-| **Orchestration & Runtime** | Bash (`run_pipeline.sh`), Apache Airflow (`DAG`), Docker Compose | Run the full workflow locally or in containers, and define task dependencies for daily scheduling |
+| **Workflow Orchestration** | Apache Airflow (`DAG`), Bash (`run_pipeline.sh`) | Define parallel Bronze/Silver task dependencies (`dags/nordic_power_dag.py`) and one-command local execution |
+| **Containerisation** | Docker (`Dockerfile`, `docker-compose.yml`) | Package Python 3.11, OpenJDK, PySpark, and a health-checked `postgres:16-alpine` database container |
 | **CI Validation** | GitHub Actions (`.github/workflows/ci.yml`) | Check shell/Python syntax and run the `pytest` suite against fixture data on every push |
 | **Downstream Analytics** | Jupyter, `scipy`, `matplotlib` | Compare rule-based BESS arbitrage against a linear programming (LP) upper bound |
 
