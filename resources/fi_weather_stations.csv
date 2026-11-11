@@ -1,0 +1,4 @@
+station_id,city_name,region,grid_role,latitude,longitude
+FI_HEL,Helsinki,Uusimaa,Demand_Hub,60.1699,24.9384
+FI_VAA,Vaasa,Ostrobothnia,Wind_Generation_Belt,63.0951,21.6165
+FI_OLK,Eurajoki_Olkiluoto,Satakunta,Nuclear_Baseload_Hub,61.2369,21.4408

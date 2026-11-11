@@ -1,0 +1,21 @@
+unit_id,unit_name,psr_type,latitude,longitude,capacity_mw,municipality,operator
+FI_OL3,Olkiluoto 3 EPR,Nuclear,61.2369,21.4422,1600.0,Eurajoki,Teollisuuden Voima (TVO)
+FI_OL1,Olkiluoto 1 BWR,Nuclear,61.2367,21.4408,890.0,Eurajoki,Teollisuuden Voima (TVO)
+FI_OL2,Olkiluoto 2 BWR,Nuclear,61.2368,21.4415,890.0,Eurajoki,Teollisuuden Voima (TVO)
+FI_LOV1,Loviisa 1 VVER,Nuclear,60.3719,26.3469,507.0,Loviisa,Fortum
+FI_LOV2,Loviisa 2 VVER,Nuclear,60.3722,26.3475,507.0,Loviisa,Fortum
+FI_LES_W1,Lestijarvi Wind Farm,Wind Onshore,63.5256,24.6644,455.4,Lestijarvi,OX2 / Kymppivoima
+FI_MUT_W1,Mutkalampi Wind Farm,Wind Onshore,64.0620,24.2150,404.0,Kalajoki,Prokon / Neoen
+FI_PJE_W1,Pjelax Wind Farm,Wind Onshore,62.3580,21.3890,380.0,Narpes,Fortum / Helen
+FI_PII_W1,Piiparinmaki Wind Farm,Wind Onshore,64.0850,26.6500,211.0,Pyhanta,Ilmatar / Glennmont
+FI_TAH_WO1,Tahkoluoto Offshore Wind,Wind Offshore,61.6300,21.3650,42.0,Pori,Suomen Hyotytuuli
+FI_IMA_H1,Imatra Hydro Plant,Hydro,61.1683,28.7736,192.0,Imatra,Fortum
+FI_PET_H1,Petajaskoski Hydro Plant,Hydro,66.2694,25.3375,182.0,Rovaniemi,Kemijoki Oy
+FI_PIR_H1,Pirttikoski Hydro Plant,Hydro,66.3375,27.1353,152.0,Rovaniemi,Kemijoki Oy
+FI_PYH_H1,Pyhakoski Hydro Plant,Hydro,64.8117,26.0028,149.0,Muhos,Fortum
+FI_OLK_B1,Olkiluoto Grid BESS,Battery Storage,61.2375,21.4450,90.0,Eurajoki,TVO / Hitachi Energy
+FI_AKK_B1,Akkula Big Battery,Battery Storage,61.1272,21.5113,62.5,Rauma,Neoen
+FI_YPR_B2,Yllikkala Power Reserve Two,Battery Storage,61.0315,28.1125,56.4,Lappeenranta,Neoen
+FI_YPR_B1,Yllikkala Power Reserve One,Battery Storage,61.0310,28.1120,30.0,Lappeenranta,Neoen
+FI_VUO_G1,Vuosaari B CHP Plant,Fossil Gas,60.2236,25.1742,510.0,Helsinki,Helen Oy
+FI_ALH_B1,Alholmens Kraft Bio-CHP,Biomass,63.7083,22.6917,265.0,Pietarsaari,Alholmens Kraft

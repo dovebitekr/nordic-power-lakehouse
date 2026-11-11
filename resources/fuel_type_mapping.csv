@@ -1,0 +1,9 @@
+source_key,entsoe_psr_code,psr_type,fingrid_dataset_id,column_name,fuel_category,source_category,measurement_type,is_renewable,is_dispatchable,carbon_g_per_kwh
+wind,B19,Wind Onshore,75,wind_mw,Wind,Clean,Measured,true,false,11.0
+nuclear,B14,Nuclear,188,nuclear_mw,Nuclear,Nuclear,Measured,false,true,12.0
+hydro,B12,Hydro Water Reservoir,191,hydro_mw,Hydro,Clean,Measured,true,true,24.0
+solar,B16,Solar,248,solar_mw,Solar PV,Clean,Updated_Forecast,true,false,41.0
+biomass,B01,Biomass,0,other_mw,Biomass,Clean,Derived_Residual,true,true,230.0
+fossil_gas,B04,Fossil Gas,0,other_mw,Fossil Gas,Fossil,Derived_Residual,false,true,490.0
+fossil_peat,B07,Fossil Peat,0,other_mw,Fossil Peat,Fossil,Derived_Residual,false,true,1060.0
+bess,B25,Energy Storage,0,bess_mw,Battery Storage,Clean,Simulated,false,true,0.0

@@ -1,0 +1,10 @@
+grid_zone,zone_name,fingrid_corridor,latitude,longitude,nominal_capacity_mw
+_FI_S,Southern Capital Load Zone,Southern 400kV Ring,60.2055,24.9384,5200.0
+_FI_SW,South-West Nuclear & Coast,Olkiluoto-Rauma 400kV Hub,61.2369,21.4422,3380.0
+_FI_W,Ostrobothnia Wind Corridor,West Coast Wind Belt,63.5256,22.8403,4500.0
+_FI_P1,Cut P1 Central Bottleneck,Kokkola-Kajaani Cross-Section P1,63.9500,25.5000,3900.0
+_FI_E,Lake District & South-East,Imatra-Yllikkala 400kV Corridor,61.1683,28.1861,1800.0
+_FI_N,Kemijoki-Oulujoki Hydro Zone,Northern Hydro & Aurora Line,66.2694,25.7285,2800.0
+_HVDC_FS,Fenno-Skan Interconnector (FI-SE3),Rauma-Dannebo HVDC 1 & 2,61.1272,21.5113,1200.0
+_HVDC_EL,EstLink Interconnector (FI-EE),Espoo-Anttila HVDC 1 & 2,60.3719,25.5500,1016.0
+_AC_SE1,Northern AC Interconnector (FI-SE1),Tornio-Kalix 400kV AC Lines,65.8481,24.1466,1500.0

@@ -1,14 +1,15 @@
-import os
-import sys
-import requests
-from dotenv import load_dotenv
-import json
-import time
-from pathlib import Path
 import argparse
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
+import json
 import logging
+import os
+from pathlib import Path
+import sys
+import time
+from dateutil.relativedelta import relativedelta
+from dotenv import load_dotenv
+import requests
+import yaml
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,12 +23,12 @@ API_KEY = os.getenv("FINGRID_API_KEY")
 if not API_KEY:
     raise ValueError("FINGRID_API_KEY is not configured in the .env file")
 
-DATASETS = {
-    "wind_generation": 75,
-    "nuclear_generation": 188,
-    "hydro_generation": 191,
-    "total_consumption": 124
-}
+# Load configuration from central YAML file
+with open(BASE_DIR / "common/config.yaml", "r", encoding="utf-8") as cfg_file:
+    CONFIG = yaml.safe_load(cfg_file)
+
+BASE_URL = CONFIG["fingrid"]["base_url"]
+DATASETS = CONFIG["fingrid"]["datasets"]
 HEADERS = {
     "x-api-key": API_KEY,
     "Accept": "application/json"
@@ -82,7 +83,7 @@ while current_start < global_end:
             continue
 
         logging.info("Fetching metric: %s with id: %s", metric_name, dataset_id)
-        endpoint_url = f"https://data.fingrid.fi/api/datasets/{dataset_id}/data"
+        endpoint_url = f"{BASE_URL}/{dataset_id}/data"
         response = None
         for attempt in range(1, 4):
             try:

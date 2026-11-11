@@ -1,0 +1,60 @@
+# Fingrid Open Data telemetry configuration
+fingrid:
+  base_url: "https://data.fingrid.fi/api/datasets"
+  output_file_template: "{}_{}_{}.json"
+  partition_cols:
+    - year
+  datasets:
+    wind_generation: 75
+    nuclear_generation: 188
+    hydro_generation: 191
+    solar_generation: 248
+    total_consumption: 124
+
+# ENTSO-E Day-Ahead market price configuration
+entsoe:
+  base_url: "https://web-api.tp.entsoe.eu/api"
+  zone: "10YFI-1--------U"
+  document_type: "A44"
+  output_file_template: "day_ahead_prices_{}_{}.xml"
+  table_name: "day_ahead_price"
+  partition_cols:
+    - year
+
+# Open-Meteo Finnish meteorological configuration
+weather:
+  base_url: "https://historical-forecast-api.open-meteo.com/v1/forecast"
+  output_file_template: "{}_{}_{}.json"
+  table_name: "finnish_weather"
+  partition_cols:
+    - year
+  demand_hub:
+    station_id: "FI_HEL"
+    latitude: 60.1699
+    longitude: 24.9384
+  wind_hub:
+    station_id: "FI_VAA"
+    latitude: 63.0951
+    longitude: 21.6165
+
+# Coordinate municipality name standardisation mapping
+coordinate_df_replace_mapping:
+  Narpes: "Närpiö"
+  Pyhanta: "Pyhäntä"
+  Lestijarvi: "Lestijärvi"
+  Pietarsaari: "Jakobstad"
+
+# PostgreSQL Star Schema table names
+postgres_tables:
+  dim_datetime: "dim_datetime"
+  dim_energy_source: "dim_energy_source"
+  dim_weather_station: "dim_weather_station"
+  dim_power_unit: "dim_power_unit"
+  dim_fi_city: "dim_fi_city"
+  dim_fi_region: "dim_fi_region"
+  dim_grid_zone: "dim_grid_zone"
+  fct_power_market: "fct_power_market_15min"
+  fct_bess_daily: "fct_bess_daily"
+  vw_power_market_360: "vw_power_market_360"
+  vw_monthly_market_summary: "vw_monthly_market_summary"
+  vw_regional_capacity_by_fuel: "vw_regional_capacity_by_fuel"

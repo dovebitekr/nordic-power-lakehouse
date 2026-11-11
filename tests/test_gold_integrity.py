@@ -28,11 +28,14 @@ def gold_df():
         "wind_mw": 1000.0,
         "nuclear_mw": 3000.0,
         "hydro_mw": 1500.0,
+        "solar_mw": 200.0,
         "consumption_mw": 8000.0,
         "price_eur_per_mwh": 45.0,
-        "selected_generation_mw": 5500.0,
-        "selected_gen_balance_mw": -2500.0,
-        "wind_share_selected_ratio": round(1000.0 / 5500.0, 3),
+        "temp_c": 5.0,
+        "wind_speed_ms": 6.5,
+        "selected_generation_mw": 5700.0,
+        "selected_gen_balance_mw": -2300.0,
+        "wind_share_selected_ratio": round(1000.0 / 5700.0, 3),
         "year": start_hel.year,
     })
 
@@ -42,7 +45,10 @@ required_cols = [
     "wind_mw",
     "nuclear_mw",
     "hydro_mw",
-    "consumption_mw"
+    "solar_mw",
+    "consumption_mw",
+    "temp_c",
+    "wind_speed_ms",
 ]
 def test_gold_no_null_values(gold_df):
     """
@@ -98,7 +104,7 @@ def test_power_balance_math_consistency(gold_df):
     """
     df = gold_df
     # Total selected generation check
-    expected_gen = df["wind_mw"] + df["nuclear_mw"] + df["hydro_mw"]
+    expected_gen = df["wind_mw"] + df["nuclear_mw"] + df["hydro_mw"] + df["solar_mw"]
     gen_mask = np.isclose(expected_gen, df["selected_generation_mw"], atol=1e-2)
     assert gen_mask.all(), (
         f"selected_generation_mw mismatch at timestamps: {df.loc[~gen_mask, 'start_time_utc'].tolist()}"
@@ -144,10 +150,17 @@ def test_temporal_feature_integrity(gold_df):
 def test_physical_limits_and_pricing(gold_df):
 
     df = gold_df
-    # Check that generation and consumption values are non-negative
-    for col in ["wind_mw", "nuclear_mw", "hydro_mw", "consumption_mw"]:
+    # Check that generation, consumption, and wind speed values are non-negative
+    for col in ["wind_mw", "nuclear_mw", "hydro_mw", "solar_mw", "consumption_mw", "wind_speed_ms"]:
         neg_ts = df.loc[df[col] < 0, "start_time_utc"].tolist()
         assert len(neg_ts) == 0, f"Column '{col}' has negative values at timestamps: {neg_ts}"
+
+    # Check ambient temperature against Nordic physical bounds
+    bad_temp_ts = df.loc[
+        (df["temp_c"] < -60) | (df["temp_c"] > 50),
+        "start_time_utc",
+    ].tolist()
+    assert len(bad_temp_ts) == 0, f"Temperature outside physical bounds at timestamps: {bad_temp_ts}"
     
     # Check price bounds against market clearing limits
     bad_price_ts = df.loc[

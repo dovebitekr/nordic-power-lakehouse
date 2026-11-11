@@ -40,21 +40,25 @@ spark = (
 
 # Silver metric paths
 metrics = {
-    "wind_mw": BASE_DIR / "data/silver/fingrid/wind_generation",
-    "nuclear_mw": BASE_DIR / "data/silver/fingrid/nuclear_generation",
-    "hydro_mw": BASE_DIR / "data/silver/fingrid/hydro_generation",
-    "consumption_mw": BASE_DIR / "data/silver/fingrid/total_consumption",
-    "price_eur_per_mwh": BASE_DIR / "data/silver/entsoe/day_ahead_price"
+    "wind_mw": (BASE_DIR / "data/silver/fingrid/wind_generation", ["wind_mw"]),
+    "nuclear_mw": (BASE_DIR / "data/silver/fingrid/nuclear_generation", ["nuclear_mw"]),
+    "hydro_mw": (BASE_DIR / "data/silver/fingrid/hydro_generation", ["hydro_mw"]),
+    "solar_mw": (BASE_DIR / "data/silver/fingrid/solar_generation", ["solar_mw"]),
+    "consumption_mw": (BASE_DIR / "data/silver/fingrid/total_consumption", ["consumption_mw"]),
+    "price_eur_per_mwh": (BASE_DIR / "data/silver/entsoe/day_ahead_price", ["price_eur_per_mwh"]),
+    "weather": (BASE_DIR / "data/silver/weather/finnish_weather", ["temp_c", "wind_speed_ms"]),
 }
 
 # Load silver tables and detect dynamic bounds when arguments are omitted
 silver_dfs = {}
 min_timestamps = []
 max_timestamps = []
+metric_cols = []
 
-for col_name, path in metrics.items():
-    sdf = spark.read.parquet(str(path)).select("start_time_utc", col_name)
-    silver_dfs[col_name] = sdf
+for key, (path, cols) in metrics.items():
+    sdf = spark.read.parquet(str(path)).select("start_time_utc", *cols)
+    silver_dfs[key] = sdf
+    metric_cols.extend(cols)
     if args.start is None or args.end is None:
         bounds = sdf.agg(
             F.date_format(F.min("start_time_utc"), "yyyy-MM-dd HH:mm:ss").alias("min_ts"),
@@ -102,7 +106,7 @@ for col_name, sdf in silver_dfs.items():
 
 # Log missing values before forward fill so human operators can inspect anomalies
 pre_fill_missing = {}
-for col_name in metrics.keys():
+for col_name in metric_cols:
     missing_rows = (
         joined_df
         .filter(F.col(col_name).isNull())
@@ -127,10 +131,17 @@ w = Window.orderBy("start_time_utc").rowsBetween(-1, 0)
 gold_df = (
     joined_df
     .withColumn("wind_mw", F.last("wind_mw", ignorenulls=True).over(w))
+    .withColumn("solar_mw", F.last("solar_mw", ignorenulls=True).over(w))
     .withColumn("consumption_mw", F.last("consumption_mw", ignorenulls=True).over(w))
-    .withColumn("selected_generation_mw", F.round(F.col("wind_mw") + F.col("nuclear_mw") + F.col("hydro_mw"), 3))
+    .withColumn(
+        "selected_generation_mw",
+        F.round(F.col("wind_mw") + F.col("nuclear_mw") + F.col("hydro_mw") + F.col("solar_mw"), 3),
+    )
     .withColumn("selected_gen_balance_mw", F.round(F.col("selected_generation_mw") - F.col("consumption_mw"), 3))
-    .withColumn("wind_share_selected_ratio", F.when(F.col("selected_generation_mw") > 0, F.round((F.col("wind_mw")/F.col("selected_generation_mw")), 3)).otherwise(0.0))
+    .withColumn(
+        "wind_share_selected_ratio",
+        F.when(F.col("selected_generation_mw") > 0, F.round(F.col("wind_mw") / F.col("selected_generation_mw"), 3)).otherwise(0.0),
+    )
     .withColumn("year", F.year("start_time_helsinki"))
     .orderBy("start_time_utc")
 )

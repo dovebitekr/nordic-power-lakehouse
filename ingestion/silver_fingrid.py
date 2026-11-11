@@ -120,6 +120,13 @@ pipeline_tasks = [
         "out": str(BASE_DIR / "data/silver/fingrid/hydro_generation"),
     },
     {
+        "pattern": "solar_generation_*.json",
+        "col": "solar_mw",
+        "is_gen": True,
+        "resample": False,
+        "out": str(BASE_DIR / "data/silver/fingrid/solar_generation"),
+    },
+    {
         "pattern": "total_consumption_*.json",
         "col": "consumption_mw",
         "is_gen": False,
