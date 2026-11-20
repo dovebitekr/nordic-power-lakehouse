@@ -70,7 +70,6 @@ bq_tables:
   dim_power_unit: "dim_power_unit"
   dim_fi_city: "dim_fi_city"
   dim_fi_region: "dim_fi_region"
-  dim_weather_station: "dim_weather_station"
   fct_unit_generation: "fct_unit_generation_15min"
   fct_fuel_generation: "fct_fuel_generation_15min"
   fct_day_ahead_price: "fct_day_ahead_price_15min"

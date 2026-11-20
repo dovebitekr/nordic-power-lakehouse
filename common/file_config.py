@@ -41,7 +41,6 @@ PSR_FUEL_TYPE_MAPPING_FILE = RESOURCES_DIR / "psr_fuel_type_mapping.csv"
 POWER_UNITS_MASTER_FILE = RESOURCES_DIR / "fi_power_units_master.csv"
 FI_CITIES_COORDINATES_FILE = RESOURCES_DIR / "fi_cities_coordinates.csv"
 FI_REGIONS_COORDINATES_FILE = RESOURCES_DIR / "fi_regions_coordinates.csv"
-WEATHER_STATIONS_FILE = RESOURCES_DIR / "fi_weather_stations.csv"
 
 # Coordinate standardisation dictionary from YAML
 coordinate_df_replace_mapping = config["coordinate_df_replace_mapping"]
@@ -53,7 +52,6 @@ dim_fuel_type_table_name = BQ_TABLES["dim_fuel_type"]
 dim_power_unit_table_name = BQ_TABLES["dim_power_unit"]
 dim_fi_city_table_name = BQ_TABLES["dim_fi_city"]
 dim_fi_region_table_name = BQ_TABLES["dim_fi_region"]
-dim_weather_station_table_name = BQ_TABLES["dim_weather_station"]
 fct_unit_generation_table_name = BQ_TABLES["fct_unit_generation"]
 fct_fuel_generation_table_name = BQ_TABLES["fct_fuel_generation"]
 fct_day_ahead_price_table_name = BQ_TABLES["fct_day_ahead_price"]
@@ -87,11 +85,5 @@ initialise_dimension_files_config_list = [
         "local_file": POWER_UNITS_MASTER_FILE,
         "gcs_path": f"resources/{POWER_UNITS_MASTER_FILE.name}",
         "pk": "unit_mrid",
-    },
-    {
-        "table_name": dim_weather_station_table_name,
-        "local_file": WEATHER_STATIONS_FILE,
-        "gcs_path": f"resources/{WEATHER_STATIONS_FILE.name}",
-        "pk": "station_id",
     },
 ]

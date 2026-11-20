@@ -180,7 +180,6 @@ CREATE_ANALYTICAL_VIEWS_SQL = [
         u.latitude AS unit_latitude,
         u.longitude AS unit_longitude,
         c.city,
-        c.city_ascii,
         r.region AS region_en,
         r.region_fi,
         ft.entsoe_psr_code,
