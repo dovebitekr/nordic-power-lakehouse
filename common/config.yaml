@@ -1,3 +1,11 @@
+# Google Cloud Platform (GCS Data Lake & BigQuery Data Warehouse) configuration
+gcp:
+  project_id: "project-4bb54fe6-af46-421c-bc7"
+  region: "us-central1"
+  bq_location: "US"
+  gcs_bucket: "nordic-power-lakehouse-fi-data"
+  bq_dataset: "nordic_power_analytics"
+
 # ENTSO-E Transparency Platform API configuration (Finland bidding zone)
 entsoe:
   base_url: "https://web-api.tp.entsoe.eu/api"
@@ -65,8 +73,8 @@ coordinate_df_replace_mapping:
   Lestijarvi: "Lestijärvi"
   Pietarsaari: "Jakobstad"
 
-# PostgreSQL Star Schema tables and analytical 360 views
-postgres_tables:
+# BigQuery Star Schema tables and analytical 360 views
+bq_tables:
   dim_datetime: "dim_datetime"
   dim_fuel_type: "dim_fuel_type"
   dim_power_unit: "dim_power_unit"
