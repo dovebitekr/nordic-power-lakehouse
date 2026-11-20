@@ -17,23 +17,34 @@ logging.basicConfig(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+from common.file_config import (
+    BRONZE_DIR,
+    INITIALISE_END_DATE,
+    INITIALISE_START_DATE,
+    config,
+)
+
 load_dotenv(BASE_DIR / ".env")
 
 TOKEN = os.getenv("ENTSOE_API_KEY")
 if not TOKEN:
     raise ValueError("ENTSOE_API_KEY is missing in .env file.")
 
+ENTSOE_CFG = config["entsoe"]
+
 parser = argparse.ArgumentParser(description="Fetch ENTSO-E Day-Ahead Prices for Finland")
 parser.add_argument(
     "--start",
     type=str,
-    default="2025-11-01",
+    default=INITIALISE_START_DATE,
     help="Start date in YYYY-MM-DD format",
 )
 parser.add_argument(
     "--end",
     type=str,
-    default="2026-11-01",
+    default=INITIALISE_END_DATE,
     help="End date in YYYY-MM-DD format",
 )
 parser.add_argument(
@@ -43,10 +54,11 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-out_dir = BASE_DIR / "data/bronze/entsoe/day_ahead_prices/FI"
+out_dir = BRONZE_DIR / "entsoe/day_ahead_prices/FI"
 out_dir.mkdir(parents=True, exist_ok=True)
-ZONE = "10YFI-1--------U"
-url = "https://web-api.tp.entsoe.eu/api"
+ZONE = ENTSOE_CFG["zone"]
+DOC_TYPE = ENTSOE_CFG["document_type"]
+url = ENTSOE_CFG["base_url"]
 
 # Parse start and end dates
 current_start = datetime.strptime(args.start, "%Y-%m-%d")
@@ -72,7 +84,7 @@ while current_start < global_end:
 
     params = {
         "securityToken": TOKEN,
-        "documentType": "A44",
+        "documentType": DOC_TYPE,
         "in_Domain": ZONE,
         "out_Domain": ZONE,
         "periodStart": p_start,

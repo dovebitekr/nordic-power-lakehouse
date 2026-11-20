@@ -95,7 +95,13 @@ def process_fingrid_bronze_to_silver(
 
 # Task configuration for core metrics
 BASE_DIR = Path(__file__).resolve().parent.parent
-bronze_dir = BASE_DIR / "data/bronze/fingrid"
+sys.path.insert(0, str(BASE_DIR))
+
+from common.file_config import BRONZE_DIR, SILVER_DIR, config
+
+bronze_dir = BRONZE_DIR / "fingrid"
+silver_fingrid_dir = SILVER_DIR / "fingrid"
+partition_cols = config["fingrid"]["partition_cols"]
 
 pipeline_tasks = [
     {
@@ -103,35 +109,35 @@ pipeline_tasks = [
         "col": "wind_mw",
         "is_gen": True,
         "resample": False,
-        "out": str(BASE_DIR / "data/silver/fingrid/wind_generation"),
+        "out": str(silver_fingrid_dir / "wind_generation"),
     },
     {
         "pattern": "nuclear_generation_*.json",
         "col": "nuclear_mw",
         "is_gen": True,
         "resample": True,
-        "out": str(BASE_DIR / "data/silver/fingrid/nuclear_generation"),
+        "out": str(silver_fingrid_dir / "nuclear_generation"),
     },
     {
         "pattern": "hydro_generation_*.json",
         "col": "hydro_mw",
         "is_gen": True,
         "resample": True,
-        "out": str(BASE_DIR / "data/silver/fingrid/hydro_generation"),
+        "out": str(silver_fingrid_dir / "hydro_generation"),
     },
     {
         "pattern": "solar_generation_*.json",
         "col": "solar_mw",
         "is_gen": True,
         "resample": False,
-        "out": str(BASE_DIR / "data/silver/fingrid/solar_generation"),
+        "out": str(silver_fingrid_dir / "solar_generation"),
     },
     {
         "pattern": "total_consumption_*.json",
         "col": "consumption_mw",
         "is_gen": False,
         "resample": False,
-        "out": str(BASE_DIR / "data/silver/fingrid/total_consumption"),
+        "out": str(silver_fingrid_dir / "total_consumption"),
     },
 ]
 
@@ -160,6 +166,6 @@ for task in pipeline_tasks:
     logging.info("Transformed %s with %s records", task["col"], row_count)
     
     # Save to Parquet
-    df.coalesce(1).write.mode("overwrite").partitionBy("year").format("parquet").save(task["out"])
+    df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(task["out"])
 
 logging.info("All silver datasets successfully processed and saved")

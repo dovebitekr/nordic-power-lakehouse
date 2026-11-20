@@ -8,6 +8,7 @@ import pyspark.sql.functions as F
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
+from common.file_config import BRONZE_DIR, SILVER_DIR, config
 from common.schema import WEATHER_SILVER_SCHEMA
 
 os.environ["PYSPARK_PYTHON"] = sys.executable
@@ -74,7 +75,7 @@ def parse_open_meteo_hourly(spark_session, json_paths: list[str], raw_field: str
     return quarter_hour_df
 
 
-bronze_dir = BASE_DIR / "data/bronze/weather"
+bronze_dir = BRONZE_DIR / "weather"
 temp_files = sorted(bronze_dir.glob("helsinki_temp_*.json"))
 wind_files = sorted(bronze_dir.glob("vaasa_wind_*.json"))
 
@@ -117,6 +118,7 @@ if row_count == 0:
     logging.error("Silver weather dataset has zero records")
     sys.exit(1)
 
-out_path = str(BASE_DIR / "data/silver/weather/finnish_weather")
-weather_silver_df.coalesce(1).write.mode("overwrite").partitionBy("year").format("parquet").save(out_path)
+out_path = str(SILVER_DIR / "weather" / config["weather"]["table_name"])
+partition_cols = config["weather"]["partition_cols"]
+weather_silver_df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(out_path)
 logging.info("Saved %s Silver weather records to %s", row_count, out_path)

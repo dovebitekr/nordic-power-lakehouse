@@ -5,7 +5,6 @@ from pathlib import Path
 import sys
 import time
 import requests
-import yaml
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,25 +13,29 @@ logging.basicConfig(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
 
-# Load configuration from central YAML file
-with open(BASE_DIR / "common/config.yaml", "r", encoding="utf-8") as cfg_file:
-    CONFIG = yaml.safe_load(cfg_file)
+from common.file_config import (
+    BRONZE_DIR,
+    INITIALISE_END_DATE,
+    INITIALISE_START_DATE,
+    config,
+)
 
-WEATHER_CFG = CONFIG["weather"]
+WEATHER_CFG = config["weather"]
 BASE_URL = WEATHER_CFG["base_url"]
 
 parser = argparse.ArgumentParser(description="Fetch Finnish weather observations from Open-Meteo")
 parser.add_argument(
     "--start",
     type=str,
-    default="2025-11-01",
+    default=INITIALISE_START_DATE,
     help="Start date in YYYY-MM-DD format",
 )
 parser.add_argument(
     "--end",
     type=str,
-    default="2026-11-01",
+    default=INITIALISE_END_DATE,
     help="End date in YYYY-MM-DD format",
 )
 parser.add_argument(
@@ -42,7 +45,7 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-OUTPUT_DIR = BASE_DIR / "data/bronze/weather"
+OUTPUT_DIR = BRONZE_DIR / "weather"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 stations = [

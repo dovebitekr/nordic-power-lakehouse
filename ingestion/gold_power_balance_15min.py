@@ -25,6 +25,9 @@ args = parser.parse_args()
 
 # Path configuration
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+from common.file_config import GOLD_DIR, SILVER_DIR, config
 
 # Initialise spark session
 spark = (
@@ -40,13 +43,13 @@ spark = (
 
 # Silver metric paths
 metrics = {
-    "wind_mw": (BASE_DIR / "data/silver/fingrid/wind_generation", ["wind_mw"]),
-    "nuclear_mw": (BASE_DIR / "data/silver/fingrid/nuclear_generation", ["nuclear_mw"]),
-    "hydro_mw": (BASE_DIR / "data/silver/fingrid/hydro_generation", ["hydro_mw"]),
-    "solar_mw": (BASE_DIR / "data/silver/fingrid/solar_generation", ["solar_mw"]),
-    "consumption_mw": (BASE_DIR / "data/silver/fingrid/total_consumption", ["consumption_mw"]),
-    "price_eur_per_mwh": (BASE_DIR / "data/silver/entsoe/day_ahead_price", ["price_eur_per_mwh"]),
-    "weather": (BASE_DIR / "data/silver/weather/finnish_weather", ["temp_c", "wind_speed_ms"]),
+    "wind_mw": (SILVER_DIR / "fingrid/wind_generation", ["wind_mw"]),
+    "nuclear_mw": (SILVER_DIR / "fingrid/nuclear_generation", ["nuclear_mw"]),
+    "hydro_mw": (SILVER_DIR / "fingrid/hydro_generation", ["hydro_mw"]),
+    "solar_mw": (SILVER_DIR / "fingrid/solar_generation", ["solar_mw"]),
+    "consumption_mw": (SILVER_DIR / "fingrid/total_consumption", ["consumption_mw"]),
+    "price_eur_per_mwh": (SILVER_DIR / "entsoe" / config["entsoe"]["table_name"], ["price_eur_per_mwh"]),
+    "weather": (SILVER_DIR / "weather" / config["weather"]["table_name"], ["temp_c", "wind_speed_ms"]),
 }
 
 # Load silver tables and detect dynamic bounds when arguments are omitted
@@ -159,7 +162,7 @@ for col_name, pre_count in pre_fill_missing.items():
         )
 
 # Save output partitioned by year
-outdir = str(BASE_DIR / "data/gold/power_market_15min")
+outdir = str(GOLD_DIR)
 gold_df.coalesce(1).write.mode("overwrite").partitionBy("year").format("parquet").save(outdir)
 
 logging.info("Successfully saved Gold dataset to %s", outdir)

@@ -1,0 +1,15 @@
+entsoe_psr_code,psr_type,fuel_category,source_category,is_renewable,is_dispatchable,carbon_g_per_kwh
+B01,Biomass,Biomass,Clean,true,true,230.0
+B04,Fossil Gas,Fossil Gas,Fossil,false,true,490.0
+B05,Fossil Hard coal,Fossil Coal,Fossil,false,true,820.0
+B06,Fossil Oil,Fossil Oil,Fossil,false,true,650.0
+B08,Fossil Peat,Fossil Peat,Fossil,false,true,1060.0
+B11,Hydro Run-of-river and poundage,Hydro,Clean,true,true,24.0
+B12,Hydro Water Reservoir,Hydro,Clean,true,true,24.0
+B14,Nuclear,Nuclear,Nuclear,false,true,12.0
+B15,Other renewable,Other Renewable,Clean,true,false,38.0
+B16,Solar,Solar,Clean,true,false,41.0
+B17,Waste,Waste,Other,false,true,350.0
+B18,Wind Offshore,Wind,Clean,true,false,12.0
+B19,Wind Onshore,Wind,Clean,true,false,11.0
+B20,Other,Other,Other,false,true,400.0

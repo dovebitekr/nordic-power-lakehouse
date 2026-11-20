@@ -1,19 +1,20 @@
 from common.file_config import (
     dim_datetime_table_name,
-    dim_energy_source_table_name,
     dim_fi_city_table_name,
     dim_fi_region_table_name,
+    dim_fuel_type_table_name,
     dim_grid_zone_table_name,
     dim_power_unit_table_name,
     dim_weather_station_table_name,
-    fct_bess_daily_table_name,
+    fct_fuel_generation_table_name,
     fct_power_market_table_name,
-    vw_monthly_market_summary_name,
-    vw_power_market_360_name,
-    vw_regional_capacity_by_fuel_name,
+    fct_unit_generation_table_name,
+    vw_fuel_generation_360_name,
+    vw_regional_generation_summary_name,
+    vw_unit_generation_360_name,
 )
 
-# SQL DDL, Upsert, and Analytical View statements for PostgreSQL Star Schema
+# SQL DDL for PostgreSQL Star Schema (Finland Power Generation Analytics)
 CREATE_STAR_SCHEMA_DDL = f"""
 CREATE TABLE IF NOT EXISTS {dim_datetime_table_name} (
     start_time_utc TIMESTAMP PRIMARY KEY,
@@ -27,43 +28,27 @@ CREATE TABLE IF NOT EXISTS {dim_datetime_table_name} (
     is_peak_hour BOOLEAN NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS {dim_energy_source_table_name} (
-    source_key VARCHAR(32) PRIMARY KEY,
-    entsoe_psr_code VARCHAR(16) NOT NULL,
+CREATE TABLE IF NOT EXISTS {dim_fuel_type_table_name} (
+    entsoe_psr_code VARCHAR(16) PRIMARY KEY,
     psr_type VARCHAR(64) NOT NULL,
-    fingrid_dataset_id INTEGER NOT NULL,
-    column_name VARCHAR(64) NOT NULL,
     fuel_category VARCHAR(32) NOT NULL,
     source_category VARCHAR(32) NOT NULL,
-    measurement_type VARCHAR(32) NOT NULL,
     is_renewable BOOLEAN NOT NULL,
     is_dispatchable BOOLEAN NOT NULL,
     carbon_g_per_kwh DOUBLE PRECISION NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS {dim_weather_station_table_name} (
-    station_id VARCHAR(32) PRIMARY KEY,
-    city_name VARCHAR(64) NOT NULL,
+CREATE TABLE IF NOT EXISTS {dim_fi_region_table_name} (
     region VARCHAR(64) NOT NULL,
-    grid_role VARCHAR(64) NOT NULL,
+    region_fi VARCHAR(64) PRIMARY KEY,
+    country VARCHAR(32) NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS {dim_power_unit_table_name} (
-    unit_id VARCHAR(32) PRIMARY KEY,
-    unit_name VARCHAR(128) NOT NULL,
-    psr_type VARCHAR(64) NOT NULL,
-    latitude DOUBLE PRECISION NOT NULL,
-    longitude DOUBLE PRECISION NOT NULL,
-    capacity_mw DOUBLE PRECISION NOT NULL,
-    municipality VARCHAR(64) NOT NULL,
-    operator VARCHAR(128) NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS {dim_fi_city_table_name} (
-    city VARCHAR(64) PRIMARY KEY,
-    city_ascii VARCHAR(64) NOT NULL,
+    city VARCHAR(64) NOT NULL,
+    city_ascii VARCHAR(64) PRIMARY KEY,
     lat DOUBLE PRECISION NOT NULL,
     lng DOUBLE PRECISION NOT NULL,
     country VARCHAR(32) NOT NULL,
@@ -75,10 +60,24 @@ CREATE TABLE IF NOT EXISTS {dim_fi_city_table_name} (
     id BIGINT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS {dim_fi_region_table_name} (
-    region VARCHAR(64) PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS {dim_power_unit_table_name} (
+    unit_mrid VARCHAR(32) PRIMARY KEY,
+    unit_name VARCHAR(128) NOT NULL,
+    entsoe_psr_code VARCHAR(16) NOT NULL REFERENCES {dim_fuel_type_table_name}(entsoe_psr_code),
+    installed_capacity_mw DOUBLE PRECISION NOT NULL,
+    city_ascii VARCHAR(64) NOT NULL,
     region_fi VARCHAR(64) NOT NULL,
-    country VARCHAR(32) NOT NULL,
+    operator VARCHAR(128) NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    is_active BOOLEAN NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS {dim_weather_station_table_name} (
+    station_id VARCHAR(32) PRIMARY KEY,
+    city_name VARCHAR(64) NOT NULL,
+    region VARCHAR(64) NOT NULL,
+    grid_role VARCHAR(64) NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL
 );
@@ -90,6 +89,21 @@ CREATE TABLE IF NOT EXISTS {dim_grid_zone_table_name} (
     latitude DOUBLE PRECISION NOT NULL,
     longitude DOUBLE PRECISION NOT NULL,
     nominal_capacity_mw DOUBLE PRECISION NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS {fct_unit_generation_table_name} (
+    start_time_utc TIMESTAMP NOT NULL REFERENCES {dim_datetime_table_name}(start_time_utc),
+    unit_mrid VARCHAR(32) NOT NULL REFERENCES {dim_power_unit_table_name}(unit_mrid),
+    entsoe_psr_code VARCHAR(16) NOT NULL REFERENCES {dim_fuel_type_table_name}(entsoe_psr_code),
+    generation_mw DOUBLE PRECISION NOT NULL,
+    PRIMARY KEY (start_time_utc, unit_mrid)
+);
+
+CREATE TABLE IF NOT EXISTS {fct_fuel_generation_table_name} (
+    start_time_utc TIMESTAMP NOT NULL REFERENCES {dim_datetime_table_name}(start_time_utc),
+    entsoe_psr_code VARCHAR(16) NOT NULL REFERENCES {dim_fuel_type_table_name}(entsoe_psr_code),
+    generation_mw DOUBLE PRECISION NOT NULL,
+    PRIMARY KEY (start_time_utc, entsoe_psr_code)
 );
 
 CREATE TABLE IF NOT EXISTS {fct_power_market_table_name} (
@@ -106,43 +120,17 @@ CREATE TABLE IF NOT EXISTS {fct_power_market_table_name} (
     selected_gen_balance_mw DOUBLE PRECISION NOT NULL,
     wind_share_selected_ratio DOUBLE PRECISION NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS {fct_bess_daily_table_name} (
-    trade_date_cet DATE PRIMARY KEY,
-    buy_threshold_eur DOUBLE PRECISION NOT NULL,
-    sell_threshold_eur DOUBLE PRECISION NOT NULL,
-    is_profitable_day BOOLEAN NOT NULL,
-    charge_steps INTEGER NOT NULL,
-    discharge_steps INTEGER NOT NULL,
-    rule_revenue_eur DOUBLE PRECISION NOT NULL,
-    avg_temp_c DOUBLE PRECISION NOT NULL,
-    avg_wind_speed_ms DOUBLE PRECISION NOT NULL,
-    avg_price_eur_mwh DOUBLE PRECISION NOT NULL
-);
 """
 
+# Idempotent Upsert statements (staging table -> target table)
 UPSERT_DIM_DATETIME_SQL = f"""
 INSERT INTO {dim_datetime_table_name} (
-    start_time_utc,
-    start_time_helsinki,
-    date_start_helsinki,
-    year,
-    month,
-    hour_helsinki,
-    season,
-    is_weekend,
-    is_peak_hour
+    start_time_utc, start_time_helsinki, date_start_helsinki,
+    year, month, hour_helsinki, season, is_weekend, is_peak_hour
 )
 SELECT
-    start_time_utc,
-    start_time_helsinki,
-    date_start_helsinki,
-    year,
-    month,
-    hour_helsinki,
-    season,
-    is_weekend,
-    is_peak_hour
+    start_time_utc, start_time_helsinki, date_start_helsinki,
+    year, month, hour_helsinki, season, is_weekend, is_peak_hour
 FROM stg_dim_datetime
 ON CONFLICT (start_time_utc) DO UPDATE SET
     start_time_helsinki = EXCLUDED.start_time_helsinki,
@@ -155,51 +143,33 @@ ON CONFLICT (start_time_utc) DO UPDATE SET
     is_peak_hour = EXCLUDED.is_peak_hour;
 """
 
-UPSERT_FCT_POWER_MARKET_SQL = f"""
-INSERT INTO {fct_power_market_table_name} (
-    start_time_utc,
-    wind_mw,
-    nuclear_mw,
-    hydro_mw,
-    solar_mw,
-    consumption_mw,
-    price_eur_per_mwh,
-    temp_c,
-    wind_speed_ms,
-    selected_generation_mw,
-    selected_gen_balance_mw,
-    wind_share_selected_ratio
+UPSERT_FCT_UNIT_GENERATION_SQL = f"""
+INSERT INTO {fct_unit_generation_table_name} (
+    start_time_utc, unit_mrid, entsoe_psr_code, generation_mw
 )
 SELECT
-    start_time_utc,
-    wind_mw,
-    nuclear_mw,
-    hydro_mw,
-    solar_mw,
-    consumption_mw,
-    price_eur_per_mwh,
-    temp_c,
-    wind_speed_ms,
-    selected_generation_mw,
-    selected_gen_balance_mw,
-    wind_share_selected_ratio
-FROM stg_fct_power_market
-ON CONFLICT (start_time_utc) DO UPDATE SET
-    wind_mw = EXCLUDED.wind_mw,
-    nuclear_mw = EXCLUDED.nuclear_mw,
-    hydro_mw = EXCLUDED.hydro_mw,
-    solar_mw = EXCLUDED.solar_mw,
-    consumption_mw = EXCLUDED.consumption_mw,
-    price_eur_per_mwh = EXCLUDED.price_eur_per_mwh,
-    temp_c = EXCLUDED.temp_c,
-    wind_speed_ms = EXCLUDED.wind_speed_ms,
-    selected_generation_mw = EXCLUDED.selected_generation_mw,
-    selected_gen_balance_mw = EXCLUDED.selected_gen_balance_mw,
-    wind_share_selected_ratio = EXCLUDED.wind_share_selected_ratio;
+    start_time_utc, unit_mrid, entsoe_psr_code, generation_mw
+FROM stg_fct_unit_generation
+ON CONFLICT (start_time_utc, unit_mrid) DO UPDATE SET
+    entsoe_psr_code = EXCLUDED.entsoe_psr_code,
+    generation_mw = EXCLUDED.generation_mw;
 """
 
+UPSERT_FCT_FUEL_GENERATION_SQL = f"""
+INSERT INTO {fct_fuel_generation_table_name} (
+    start_time_utc, entsoe_psr_code, generation_mw
+)
+SELECT
+    start_time_utc, entsoe_psr_code, generation_mw
+FROM stg_fct_fuel_generation
+ON CONFLICT (start_time_utc, entsoe_psr_code) DO UPDATE SET
+    generation_mw = EXCLUDED.generation_mw;
+"""
+
+# Multi-dimensional 360 Analytical Views
 CREATE_ANALYTICAL_VIEWS_SQL = f"""
-CREATE OR REPLACE VIEW {vw_power_market_360_name} AS
+-- 1. Unit-level 360 View: Fact x Power Unit x Fuel Type x City x Region x Datetime
+CREATE OR REPLACE VIEW {vw_unit_generation_360_name} AS
 SELECT
     f.start_time_utc,
     d.start_time_helsinki,
@@ -210,84 +180,90 @@ SELECT
     d.season,
     d.is_weekend,
     d.is_peak_hour,
-    f.wind_mw,
-    f.nuclear_mw,
-    f.hydro_mw,
-    f.solar_mw,
-    (f.wind_mw + f.hydro_mw + f.solar_mw) AS renewable_generation_mw,
-    f.selected_generation_mw,
-    f.consumption_mw,
-    f.selected_gen_balance_mw,
-    f.wind_share_selected_ratio,
-    f.price_eur_per_mwh,
-    f.temp_c,
-    f.wind_speed_ms,
-    ROUND(
-        CASE
-            WHEN f.selected_generation_mw > 0 THEN
-                (f.wind_mw * 11.0 + f.nuclear_mw * 12.0 + f.hydro_mw * 24.0 + f.solar_mw * 41.0)
-                / f.selected_generation_mw
-            ELSE 0.0
-        END::numeric,
-        2
-    ) AS est_grid_carbon_g_per_kwh
-FROM {fct_power_market_table_name} f
-JOIN {dim_datetime_table_name} d ON f.start_time_utc = d.start_time_utc;
+    f.unit_mrid,
+    u.unit_name,
+    u.operator,
+    u.installed_capacity_mw,
+    u.latitude AS unit_latitude,
+    u.longitude AS unit_longitude,
+    c.city,
+    c.city_ascii,
+    r.region AS region_en,
+    r.region_fi,
+    ft.entsoe_psr_code,
+    ft.psr_type,
+    ft.fuel_category,
+    ft.source_category,
+    ft.is_renewable,
+    ft.is_dispatchable,
+    ft.carbon_g_per_kwh,
+    f.generation_mw,
+    ROUND((f.generation_mw * 0.25)::numeric, 3) AS generation_mwh,
+    CASE
+        WHEN u.installed_capacity_mw > 0 THEN
+            ROUND((f.generation_mw / u.installed_capacity_mw)::numeric, 4)
+        ELSE 0.0
+    END AS capacity_factor,
+    ROUND((f.generation_mw * 0.25 * ft.carbon_g_per_kwh / 1000.0)::numeric, 3) AS est_co2_tonnes
+FROM {fct_unit_generation_table_name} f
+JOIN {dim_datetime_table_name} d
+    ON f.start_time_utc = d.start_time_utc
+JOIN {dim_power_unit_table_name} u
+    ON f.unit_mrid = u.unit_mrid
+JOIN {dim_fuel_type_table_name} ft
+    ON f.entsoe_psr_code = ft.entsoe_psr_code
+LEFT JOIN {dim_fi_city_table_name} c
+    ON u.city_ascii = c.city_ascii
+LEFT JOIN {dim_fi_region_table_name} r
+    ON u.region_fi = r.region_fi
+WHERE u.is_active = TRUE;
 
-CREATE OR REPLACE VIEW {vw_monthly_market_summary_name} AS
+-- 2. National Fuel-Mix 360 View: Fact (A75) x Fuel Type x Datetime (zero hardcoded carbon factors)
+CREATE OR REPLACE VIEW {vw_fuel_generation_360_name} AS
+SELECT
+    f.start_time_utc,
+    d.start_time_helsinki,
+    d.date_start_helsinki,
+    d.year,
+    d.month,
+    d.hour_helsinki,
+    d.season,
+    d.is_weekend,
+    d.is_peak_hour,
+    ft.entsoe_psr_code,
+    ft.psr_type,
+    ft.fuel_category,
+    ft.source_category,
+    ft.is_renewable,
+    ft.is_dispatchable,
+    ft.carbon_g_per_kwh,
+    f.generation_mw,
+    ROUND((f.generation_mw * 0.25)::numeric, 3) AS generation_mwh,
+    ROUND((f.generation_mw * 0.25 * ft.carbon_g_per_kwh / 1000.0)::numeric, 3) AS est_co2_tonnes
+FROM {fct_fuel_generation_table_name} f
+JOIN {dim_datetime_table_name} d
+    ON f.start_time_utc = d.start_time_utc
+JOIN {dim_fuel_type_table_name} ft
+    ON f.entsoe_psr_code = ft.entsoe_psr_code;
+
+-- 3. Regional Generation & Capacity Summary View with Window Function Ranking
+CREATE OR REPLACE VIEW {vw_regional_generation_summary_name} AS
 SELECT
     year,
     month,
-    season,
-    COUNT(*) AS interval_count,
-    ROUND(AVG(price_eur_per_mwh)::numeric, 2) AS avg_price_eur_mwh,
-    SUM(CASE WHEN price_eur_per_mwh <= 0 THEN 1 ELSE 0 END) AS non_positive_price_intervals,
-    ROUND(AVG(temp_c)::numeric, 2) AS avg_temp_c,
-    ROUND(AVG(wind_speed_ms)::numeric, 2) AS avg_wind_speed_ms,
-    ROUND(AVG(wind_mw)::numeric, 1) AS avg_wind_mw,
-    ROUND(AVG(nuclear_mw)::numeric, 1) AS avg_nuclear_mw,
-    ROUND(AVG(hydro_mw)::numeric, 1) AS avg_hydro_mw,
-    ROUND(AVG(solar_mw)::numeric, 1) AS avg_solar_mw,
-    ROUND(AVG(consumption_mw)::numeric, 1) AS avg_consumption_mw,
-    ROUND(AVG(est_grid_carbon_g_per_kwh)::numeric, 2) AS avg_carbon_g_per_kwh
-FROM {vw_power_market_360_name}
-GROUP BY year, month, season
-ORDER BY year, month;
-
-CREATE OR REPLACE VIEW {vw_regional_capacity_by_fuel_name} AS
-WITH unit_enriched AS (
-    SELECT
-        u.unit_id,
-        u.unit_name,
-        u.municipality,
-        u.operator,
-        u.psr_type,
-        COALESCE(s.fuel_category, u.psr_type) AS fuel_category,
-        COALESCE(s.source_category, 'Clean') AS source_category,
-        u.capacity_mw,
-        u.latitude,
-        u.longitude,
-        c.admin_name AS region_name
-    FROM {dim_power_unit_table_name} u
-    LEFT JOIN {dim_energy_source_table_name} s
-        ON LOWER(u.psr_type) = LOWER(s.psr_type)
-        OR LOWER(u.psr_type) = LOWER(s.fuel_category)
-    LEFT JOIN {dim_fi_city_table_name} c
-        ON LOWER(u.municipality) = LOWER(c.city_ascii)
-)
-SELECT
-    municipality,
-    COALESCE(region_name, 'Regional Grid') AS region_name,
+    region_en,
+    region_fi,
+    city,
     fuel_category,
     source_category,
-    COUNT(unit_id) AS unit_count,
-    ROUND(SUM(capacity_mw)::numeric, 1) AS total_capacity_mw,
-    ROUND(AVG(latitude)::numeric, 4) AS latitude,
-    ROUND(AVG(longitude)::numeric, 4) AS longitude,
+    COUNT(DISTINCT unit_mrid) AS active_unit_count,
+    ROUND(SUM(generation_mwh)::numeric, 1) AS total_generation_mwh,
+    ROUND(AVG(capacity_factor)::numeric, 4) AS avg_capacity_factor,
+    ROUND(SUM(est_co2_tonnes)::numeric, 1) AS total_co2_tonnes,
     ROW_NUMBER() OVER (
-        PARTITION BY municipality
-        ORDER BY SUM(capacity_mw) DESC
-    ) AS dominance_rank
-FROM unit_enriched
-GROUP BY municipality, COALESCE(region_name, 'Regional Grid'), fuel_category, source_category;
+        PARTITION BY year, month, region_fi
+        ORDER BY SUM(generation_mwh) DESC
+    ) AS regional_fuel_rank
+FROM {vw_unit_generation_360_name}
+GROUP BY year, month, region_en, region_fi, city, fuel_category, source_category;
 """

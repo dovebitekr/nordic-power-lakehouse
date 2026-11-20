@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, TimestampType, DoubleType, StringType
 
 os.environ["PYSPARK_PYTHON"] = sys.executable
 os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
@@ -17,12 +16,13 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-try:
-    BASE_DIR = Path(__file__).resolve().parent.parent
-except NameError:
-    BASE_DIR = Path.cwd().parent if Path.cwd().name != "energy_lakehouse" else Path.cwd()
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
 
-bronze_dir = BASE_DIR / "data/bronze/entsoe/day_ahead_prices/FI"
+from common.file_config import BRONZE_DIR, SILVER_DIR, config
+from common.schema import ENTSOE_PRICE_SCHEMA
+
+bronze_dir = BRONZE_DIR / "entsoe/day_ahead_prices/FI"
 xml_files = sorted(bronze_dir.glob("*.xml"))
 
 if not xml_files:
@@ -94,14 +94,8 @@ spark = (
     .getOrCreate()
 )
 
-schema = StructType([
-    StructField("start_time_utc", TimestampType(), False),
-    StructField("price_eur_per_mwh", DoubleType(), True),
-    StructField("source_resolution", StringType(), True),
-])
-
 price_df = (
-    spark.createDataFrame(all_records, schema=schema)
+    spark.createDataFrame(all_records, schema=ENTSOE_PRICE_SCHEMA)
     .dropDuplicates(["start_time_utc"])
     .withColumn(
         "start_time_helsinki",
@@ -121,6 +115,7 @@ logging.info("Total price rows: %s", row_count)
 price_df.printSchema()
 
 # Save to Silver Parquet
-silver_out = str(BASE_DIR / "data/silver/entsoe/day_ahead_price")
-price_df.coalesce(1).write.mode("overwrite").partitionBy("year").format("parquet").save(silver_out)
+silver_out = str(SILVER_DIR / "entsoe" / config["entsoe"]["table_name"])
+partition_cols = config["entsoe"]["partition_cols"]
+price_df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(silver_out)
 logging.info("Successfully saved Silver price table to %s", silver_out)

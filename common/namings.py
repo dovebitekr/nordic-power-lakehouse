@@ -1,8 +1,10 @@
 from enum import Enum, auto
 
 
-# Enumeration for Nordic power and weather data categories
+# Enumeration for Finland power generation and market data categories
 class NordicDataCategory(Enum):
-    FINGRID_SERIES = auto()
+    ENTSOE_UNIT_GENERATION = auto()
+    ENTSOE_FUEL_GENERATION = auto()
     ENTSOE_PRICE = auto()
+    FINGRID_SERIES = auto()
     WEATHER_SERIES = auto()

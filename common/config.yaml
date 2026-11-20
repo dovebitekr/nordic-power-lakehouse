@@ -1,3 +1,34 @@
+# ENTSO-E Transparency Platform API configuration (Finland bidding zone)
+entsoe:
+  base_url: "https://web-api.tp.entsoe.eu/api"
+  zone: "10YFI-1--------U"
+  process_type: "A16"
+  document_type: "A44"
+  table_name: "day_ahead_price"
+  partition_cols:
+    - year
+  datasets:
+    unit_generation:
+      document_type: "A73"
+      process_type: "A16"
+      table_name: "unit_generation"
+      output_file_template: "FI_A73_{}_{}.xml"
+      partition_cols:
+        - year
+    fuel_generation:
+      document_type: "A75"
+      process_type: "A16"
+      table_name: "fuel_generation"
+      output_file_template: "FI_A75_{}_{}.xml"
+      partition_cols:
+        - year
+    day_ahead_price:
+      document_type: "A44"
+      table_name: "day_ahead_price"
+      output_file_template: "FI_{}_{}.xml"
+      partition_cols:
+        - year
+
 # Fingrid Open Data telemetry configuration
 fingrid:
   base_url: "https://data.fingrid.fi/api/datasets"
@@ -10,16 +41,6 @@ fingrid:
     hydro_generation: 191
     solar_generation: 248
     total_consumption: 124
-
-# ENTSO-E Day-Ahead market price configuration
-entsoe:
-  base_url: "https://web-api.tp.entsoe.eu/api"
-  zone: "10YFI-1--------U"
-  document_type: "A44"
-  output_file_template: "day_ahead_prices_{}_{}.xml"
-  table_name: "day_ahead_price"
-  partition_cols:
-    - year
 
 # Open-Meteo Finnish meteorological configuration
 weather:
@@ -44,17 +65,18 @@ coordinate_df_replace_mapping:
   Lestijarvi: "Lestijärvi"
   Pietarsaari: "Jakobstad"
 
-# PostgreSQL Star Schema table names
+# PostgreSQL Star Schema tables and analytical 360 views
 postgres_tables:
   dim_datetime: "dim_datetime"
-  dim_energy_source: "dim_energy_source"
-  dim_weather_station: "dim_weather_station"
+  dim_fuel_type: "dim_fuel_type"
   dim_power_unit: "dim_power_unit"
   dim_fi_city: "dim_fi_city"
   dim_fi_region: "dim_fi_region"
+  dim_weather_station: "dim_weather_station"
   dim_grid_zone: "dim_grid_zone"
+  fct_unit_generation: "fct_unit_generation_15min"
+  fct_fuel_generation: "fct_fuel_generation_15min"
   fct_power_market: "fct_power_market_15min"
-  fct_bess_daily: "fct_bess_daily"
-  vw_power_market_360: "vw_power_market_360"
-  vw_monthly_market_summary: "vw_monthly_market_summary"
-  vw_regional_capacity_by_fuel: "vw_regional_capacity_by_fuel"
+  vw_unit_generation_360: "vw_unit_generation_360"
+  vw_fuel_generation_360: "vw_fuel_generation_360"
+  vw_regional_generation_summary: "vw_regional_generation_summary"
