@@ -1,29 +1,29 @@
 unit_mrid,unit_name,entsoe_psr_code,installed_capacity_mw,city_ascii,region_fi,operator,latitude,longitude,is_active
-44W-00000000009F,Naantali B4,B01,142.0,Naantali,Varsinais-Suomi,Turun Seudun Energiantuotanto,60.4539,22.0558,true
+44W-00000000009F,Naantali B4,B01,146.0,Naantali,Varsinais-Suomi,Turun Seudun Energiantuotanto,60.4539,22.0558,true
 44W-00000000010U,Äänekoski G1,B01,260.0,Aanekoski,Keski-Suomi,Metsä Fibre,62.6019,25.7167,true
-44W-00000000016I,Raahen Voima,B20,105.0,Raahe,Pohjois-Pohjanmaa,Raahen Voima (SSAB),64.6636,24.4325,true
+44W-00000000016I,Raahen Voima,B20,125.0,Raahe,Pohjois-Pohjanmaa,Raahen Voima (SSAB),64.6636,24.4325,true
 44W-00000000045B,Metsä Fibre Kemi G1,B01,250.0,Kemi,Lappi,Metsä Fibre,65.7444,24.5306,true
-44W-T-KT-100000D,Forssa GT1,B06,155.0,Forssa,Kanta-Häme,Fingrid (Reserve),60.8147,23.6214,true
-44W-T-KT-100001B,Forssa GT2,B06,155.0,Forssa,Kanta-Häme,Fingrid (Reserve),60.8147,23.6214,true
+44W-T-KT-100000D,Forssa GT1,B06,163.0,Forssa,Kanta-Häme,Fingrid (Reserve),60.8147,23.6214,true
+44W-T-KT-100001B,Forssa GT2,B06,163.0,Forssa,Kanta-Häme,Fingrid (Reserve),60.8147,23.6214,true
 44W-T-LV-100005C,Meri-Pori B1,B05,565.0,Pori,Satakunta,Fortum,61.6306,21.4042,true
-44W-T-LV-1000078,Vaskiluoto B3,B06,150.0,Vaasa,Pohjanmaa,EPV Energia,63.0897,21.5567,true
-44W-T-YT-100000L,Hanasaari B3,B05,110.0,Helsinki,Uusimaa,Helen Oy,60.1817,24.9711,false
-44W-T-YT-100001J,Hanasaari B4,B05,110.0,Helsinki,Uusimaa,Helen Oy,60.1817,24.9711,false
+44W-T-LV-1000078,Vaskiluoto B3,B06,153.0,Vaasa,Pohjanmaa,EPV Energia,63.0897,21.5567,true
+44W-T-YT-100000L,Hanasaari B3,B05,105.0,Helsinki,Uusimaa,Helen Oy,60.1817,24.9711,false
+44W-T-YT-100001J,Hanasaari B4,B05,105.0,Helsinki,Uusimaa,Helen Oy,60.1817,24.9711,false
 44W-T-YT-100005B,Retired Coal Unit 05B,B05,0.0,Unknown,Unknown,Decommissioned,0.0,0.0,false
 44W-T-YT-1000069,Retired Coal Unit 069,B05,0.0,Unknown,Unknown,Decommissioned,0.0,0.0,false
 44W-T-YT-1000077,Retired Coal Unit 077,B05,0.0,Unknown,Unknown,Decommissioned,0.0,0.0,false
-44W-T-YT-100010I,Salmisaari SaB,B05,160.0,Helsinki,Uusimaa,Helen Oy,60.1636,24.9019,false
-44W-T-YT-100011G,Seinäjoki B1,B08,125.0,Seinajoki,Etelä-Pohjanmaa,Vaskiluodon Voima,62.7850,22.8400,true
+44W-T-YT-100010I,Salmisaari SaB,B05,155.0,Helsinki,Uusimaa,Helen Oy,60.1636,24.9019,false
+44W-T-YT-100011G,Seinäjoki B1,B08,120.0,Seinajoki,Etelä-Pohjanmaa,Vaskiluodon Voima,62.7850,22.8400,true
 44W-T-YT-100014A,Suomenoja 2 GT,B04,150.0,Espoo,Uusimaa,Fortum,60.1494,24.7167,true
-44W-T-YT-1000166,Toppila B2,B08,130.0,Oulu,Pohjois-Pohjanmaa,Oulun Energia,65.0369,25.4322,true
+44W-T-YT-1000166,Toppila B2,B08,120.0,Oulu,Pohjois-Pohjanmaa,Oulun Energia,65.0369,25.4322,true
 44W-T-YT-1000174,Vaskiluoto B2,B05,230.0,Vaasa,Pohjanmaa,Vaskiluodon Voima,63.0897,21.5567,true
 44W-T-YT-1000182,Vuosaari VuB4,B04,160.0,Helsinki,Uusimaa,Helen Oy,60.2236,25.1742,true
 44W-T-YT-1000190,Vuosaari VuB5,B04,160.0,Helsinki,Uusimaa,Helen Oy,60.2236,25.1742,true
-44W-T-YT-100020F,Vuosaari VuB6,B04,150.0,Helsinki,Uusimaa,Helen Oy,60.2236,25.1742,true
-44W-T-YT-100021D,Alholmens B2,B08,265.0,Pietarsaari,Pohjanmaa,Alholmens Kraft,63.7083,22.6917,true
+44W-T-YT-100020F,Vuosaari VuB6,B04,160.0,Helsinki,Uusimaa,Helen Oy,60.2236,25.1742,true
+44W-T-YT-100021D,Alholmens B2,B08,240.0,Pietarsaari,Pohjanmaa,Alholmens Kraft,63.7083,22.6917,true
 44W-T-YT-100022B,Kaukaan Voima G10,B01,125.0,Lappeenranta,Etelä-Karjala,Kaukaan Voima (UPM),61.0644,28.2342,true
-44W-T-YT-1000239,Keljonlahti B1,B08,209.0,Jyvaskyla,Keski-Suomi,Alva-yhtiöt,62.2019,25.7364,true
-44W-T-YT-1000247,Kymijärvi B1,B05,167.0,Lahti,Päijät-Häme,Lahti Energia,60.9853,25.7219,true
+44W-T-YT-1000239,Keljonlahti B1,B08,190.0,Jyvaskyla,Keski-Suomi,Alva-yhtiöt,62.2019,25.7364,true
+44W-T-YT-1000247,Kymijärvi B1,B05,170.0,Lahti,Päijät-Häme,Lahti Energia,60.9853,25.7219,true
 44W-T-YV-1000003,Loviisa 1 G11,B14,253.5,Loviisa,Uusimaa,Fortum,60.3719,26.3469,true
 44W-T-YV-1000011,Loviisa 1 G12,B14,253.5,Loviisa,Uusimaa,Fortum,60.3719,26.3469,true
 44W-T-YV-100003Y,Loviisa 2 G21,B14,253.5,Loviisa,Uusimaa,Fortum,60.3722,26.3475,true
