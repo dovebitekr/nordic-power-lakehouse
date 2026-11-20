@@ -36,23 +36,11 @@ entsoe:
       document_type: "A44"
       table_name: "day_ahead_price"
       output_file_template: "FI_{}_{}.xml"
+      max_chunk_days: 30
       partition_cols:
         - year
 
-# Fingrid Open Data telemetry configuration
-fingrid:
-  base_url: "https://data.fingrid.fi/api/datasets"
-  output_file_template: "{}_{}_{}.json"
-  partition_cols:
-    - year
-  datasets:
-    wind_generation: 75
-    nuclear_generation: 188
-    hydro_generation: 191
-    solar_generation: 248
-    total_consumption: 124
-
-# Open-Meteo Finnish meteorological configuration
+# Open-Meteo Finnish weather configuration
 weather:
   base_url: "https://historical-forecast-api.open-meteo.com/v1/forecast"
   output_file_template: "{}_{}_{}.json"
@@ -83,10 +71,10 @@ bq_tables:
   dim_fi_city: "dim_fi_city"
   dim_fi_region: "dim_fi_region"
   dim_weather_station: "dim_weather_station"
-  dim_grid_zone: "dim_grid_zone"
   fct_unit_generation: "fct_unit_generation_15min"
   fct_fuel_generation: "fct_fuel_generation_15min"
-  fct_power_market: "fct_power_market_15min"
+  fct_day_ahead_price: "fct_day_ahead_price_15min"
+  fct_weather: "fct_weather_15min"
   vw_unit_generation_360: "vw_unit_generation_360"
   vw_fuel_generation_360: "vw_fuel_generation_360"
   vw_regional_generation_summary: "vw_regional_generation_summary"

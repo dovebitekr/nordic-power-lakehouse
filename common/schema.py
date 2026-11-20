@@ -28,10 +28,6 @@ NORDIC_SCHEMAS = {
         StructField("price_eur_per_mwh", DoubleType(), True),
         StructField("source_resolution", StringType(), True),
     ]),
-    NordicDataCategory.FINGRID_SERIES: StructType([
-        StructField("startTime", StringType(), False),
-        StructField("value", DoubleType(), True),
-    ]),
     NordicDataCategory.WEATHER_SERIES: StructType([
         StructField("start_time_utc", TimestampType(), False),
         StructField("temp_c", DoubleType(), True),
