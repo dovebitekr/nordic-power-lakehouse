@@ -7,3 +7,9 @@ data/
 *.parquet
 .DS_Store
 docs/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+gcp-credentials*.json
+service-account*.json
