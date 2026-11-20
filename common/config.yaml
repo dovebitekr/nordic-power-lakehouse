@@ -21,6 +21,7 @@ entsoe:
       process_type: "A16"
       table_name: "unit_generation"
       output_file_template: "FI_A73_{}_{}.xml"
+      max_chunk_days: 1
       partition_cols:
         - year
     fuel_generation:
@@ -28,6 +29,7 @@ entsoe:
       process_type: "A16"
       table_name: "fuel_generation"
       output_file_template: "FI_A75_{}_{}.xml"
+      max_chunk_days: 7
       partition_cols:
         - year
     day_ahead_price:
