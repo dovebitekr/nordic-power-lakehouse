@@ -6,6 +6,8 @@ data/
 *.duckdb
 *.parquet
 .DS_Store
+.vscode/
+.pytest_cache/
 docs/
 .terraform/
 *.tfstate

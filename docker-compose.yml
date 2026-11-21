@@ -14,15 +14,13 @@ services:
       AIRFLOW_HOME: /opt/airflow
       PYTHONPATH: /opt/airflow
       GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/.google/credentials/adc.json
-      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USER:-airflow}
-      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-airflow}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./common:/opt/airflow/common
       - ./ingestion:/opt/airflow/ingestion
       - ./resources:/opt/airflow/resources
       - ./data:/opt/airflow/data
-      - ${HOME}/.config/gcloud/application_default_credentials.json:/opt/airflow/.google/credentials/adc.json:ro
+      - ${GCP_CREDENTIALS_PATH:-~/.config/gcloud/application_default_credentials.json}:/opt/airflow/.google/credentials/adc.json:ro
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
