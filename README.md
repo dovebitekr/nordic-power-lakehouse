@@ -24,6 +24,7 @@ An end-to-end batch data pipeline on **Google Cloud Platform (GCP)** that extrac
 5. [Storage and Data Warehouse](#5-storage-and-data-warehouse)
 6. [Data Visualisation](#6-data-visualisation)
 7. [How to Reproduce](#7-how-to-reproduce)
+8. [Contact](#8-contact)
 
 ---
 
@@ -247,3 +248,12 @@ Run the automated integrity test suite directly at any time:
 ```bash
 pytest -v
 ```
+
+---
+
+## 8. Contact
+
+Feel free to reach out if you have any questions or feedback about this project.
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Hyukjae%20Lee-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/leehyukjae/)
+[![GitHub](https://img.shields.io/badge/GitHub-dovebitekr-181717?logo=github&logoColor=white)](https://github.com/dovebitekr)
