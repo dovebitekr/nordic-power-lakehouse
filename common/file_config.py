@@ -22,9 +22,9 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", GCP_CFG["gcs_bucket"])
 BQ_DATASET_NAME = os.getenv("BQ_DATASET_NAME", GCP_CFG["bq_dataset"])
 AIRFLOW_HOME = os.environ.get("AIRFLOW_HOME", str(BASE_DIR))
 
-# Initialise backfill window vs incremental batch window
+# Initialise backfill window (3-day default for fast reproducible runs) vs incremental batch window
 INITIALISE_START_DATE = os.getenv("INITIALISE_START_DATE", "2025-11-01")
-INITIALISE_END_DATE = os.getenv("INITIALISE_END_DATE", "2026-11-01")
+INITIALISE_END_DATE = os.getenv("INITIALISE_END_DATE", "2025-11-04")
 BATCH_LOOKBACK_DAYS = int(os.getenv("BATCH_LOOKBACK_DAYS", "2"))
 UNIT_PUBLICATION_LAG_DAYS = int(os.getenv("UNIT_PUBLICATION_LAG_DAYS", "5"))
 
