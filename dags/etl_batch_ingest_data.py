@@ -12,7 +12,7 @@ from airflow.operators.bash import BashOperator
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from common.file_config import BATCH_LOOKBACK_DAYS
+from common.file_config import BATCH_LOOKBACK_DAYS, UNIT_PUBLICATION_LAG_DAYS
 
 default_args = {
     "owner": "airflow",
@@ -35,13 +35,16 @@ with DAG(
 ) as dag:
 
     lookback_start = f"{{{{ macros.ds_add(ds, -{BATCH_LOOKBACK_DAYS}) }}}}"
+    unit_start = f"{{{{ macros.ds_add(ds, -{UNIT_PUBLICATION_LAG_DAYS + BATCH_LOOKBACK_DAYS}) }}}}"
+    unit_end = f"{{{{ macros.ds_add(ds, -{UNIT_PUBLICATION_LAG_DAYS}) }}}}"
 
-    # Rolling lookback Bronze extraction tasks
+    # Rolling lookback Bronze extraction tasks (A73 uses 5-day publication lag)
     batch_bronze_entsoe_generation = BashOperator(
         task_id="batch_bronze_entsoe_generation",
         bash_command=(
-            f"cd {BASE_DIR} && python ingestion/entsoe_generation.py "
-            f"--dataset all --start {lookback_start} --end {{{{ ds }}}} --overwrite"
+            f"cd {BASE_DIR} && "
+            f"python ingestion/entsoe_generation.py --dataset unit_generation --start {unit_start} --end {unit_end} --overwrite && "
+            f"python ingestion/entsoe_generation.py --dataset fuel_generation --start {lookback_start} --end {{{{ ds }}}} --overwrite"
         ),
     )
 
