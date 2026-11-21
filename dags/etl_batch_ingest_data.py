@@ -15,9 +15,12 @@ sys.path.insert(0, str(BASE_DIR))
 from common.file_config import BATCH_LOOKBACK_DAYS
 
 default_args = {
-    "owner": "data_engineer",
+    "owner": "airflow",
     "depends_on_past": False,
-    "retries": 2,
+    "start_date": datetime(2025, 11, 1),
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 1,
     "retry_delay": timedelta(minutes=5),
 }
 
@@ -26,8 +29,8 @@ with DAG(
     default_args=default_args,
     description="Daily incremental batch ingestion and BigQuery MERGE upsert for Finland power analytics",
     schedule="0 6 * * *",
-    start_date=datetime(2025, 11, 1),
     catchup=False,
+    max_active_runs=1,
     tags=["daily_batch", "gcp", "bigquery", "entsoe"],
 ) as dag:
 
