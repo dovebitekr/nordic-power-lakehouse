@@ -1,34 +1,32 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: nordic_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-lakehouse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lakehouse_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-nordic_power}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lakehouse} -d ${POSTGRES_DB:-nordic_power}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  pipeline:
+  airflow:
     build: .
-    container_name: nordic_pipeline
-    depends_on:
-      db:
-        condition: service_healthy
+    container_name: nordic_power_airflow
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
     env_file:
       - .env
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW_HOME: /opt/airflow
+      PYTHONPATH: /opt/airflow
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/.google/credentials/adc.json
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USER:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-airflow}
     volumes:
-      - ./data:/app/data
-
-volumes:
-  postgres_data:
+      - ./dags:/opt/airflow/dags
+      - ./common:/opt/airflow/common
+      - ./ingestion:/opt/airflow/ingestion
+      - ./resources:/opt/airflow/resources
+      - ./data:/opt/airflow/data
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/opt/airflow/.google/credentials/adc.json:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        airflow db migrate
+        airflow users create --username airflow --password airflow --firstname Admin --lastname User --role Admin --email admin@example.com || true
+        airflow scheduler &
+        exec airflow webserver --port 8080

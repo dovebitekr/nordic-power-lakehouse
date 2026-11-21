@@ -33,3 +33,21 @@ variable "bq_dataset_name" {
   type        = string
   default     = "nordic_power_analytics"
 }
+
+variable "create_vm" {
+  description = "Set to true to provision an optional GCP Compute Engine VM running Airflow"
+  type        = bool
+  default     = false
+}
+
+variable "vm_zone" {
+  description = "GCP zone for the optional Airflow VM"
+  type        = string
+  default     = "us-central1-a"
+}
+
+variable "vm_machine_type" {
+  description = "Machine type for the optional Airflow VM"
+  type        = string
+  default     = "e2-standard-2"
+}

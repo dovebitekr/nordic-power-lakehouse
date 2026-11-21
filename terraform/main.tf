@@ -41,3 +41,25 @@ resource "google_bigquery_dataset" "power_analytics_dataset" {
   location                    = var.bq_location
   delete_contents_on_destroy  = true
 }
+
+# Optional GCP Compute Engine VM for remote Airflow deployment (disabled by default to keep cost at $0)
+resource "google_compute_instance" "airflow_vm" {
+  count        = var.create_vm ? 1 : 0
+  name         = "nordic-power-analytics-vm"
+  machine_type = var.vm_machine_type
+  zone         = var.vm_zone
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      size  = 30
+    }
+  }
+
+  network_interface {
+    network = "default"
+    access_config {}
+  }
+
+  metadata_startup_script = file("${path.module}/../start_up_script.sh")
+}
