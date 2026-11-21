@@ -13,3 +13,4 @@ B17,Waste,Waste,Other,false,true,350.0
 B18,Wind Offshore,Wind,Clean,true,false,12.0
 B19,Wind Onshore,Wind,Clean,true,false,11.0
 B20,Other,Other,Other,false,true,400.0
+B25,Energy storage,Energy Storage,Clean,false,true,0.0
