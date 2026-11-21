@@ -5,19 +5,18 @@ set -euo pipefail
 # Move to the project root directory
 cd "$(dirname "$0")"
 
-echo "=== Starting Bronze Layer Ingestion ==="
-python ingestion/fingrid.py "$@"
+echo "=== Starting Bronze Layer Ingestion and GCS Upload ==="
+python ingestion/entsoe_generation.py --dataset all "$@"
 python ingestion/entsoe.py "$@"
+python ingestion/weather.py "$@"
 
-echo "=== Starting Silver Layer Transformation ==="
-python ingestion/silver_fingrid.py
+echo "=== Starting Silver Layer PySpark Transformations ==="
+python ingestion/silver_entsoe_generation.py
 python ingestion/silver_entsoe.py
+python ingestion/silver_weather.py
 
-echo "=== Starting Gold Layer Spine Join ==="
-python ingestion/gold_power_balance_15min.py
+echo "=== Running Automated Data Quality Gate ==="
+pytest -v tests/test_pipeline_integrity.py
 
-echo "=== Running Automated Data Quality Tests ==="
-pytest -v tests/test_gold_integrity.py
-
-echo "=== Loading Verified Gold Data into PostgreSQL ==="
-python ingestion/load_postgres.py
+echo "=== Loading Star Schema and 360 Views into BigQuery ==="
+python ingestion/load_bigquery.py

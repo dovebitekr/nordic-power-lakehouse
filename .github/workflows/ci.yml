@@ -19,16 +19,17 @@ jobs:
           python-version: "3.11"
       # Install testing dependencies
       - name: Install dependencies
-        run: pip install pandas pyarrow numpy pytest
+        run: pip install pandas pyarrow numpy pytest pyyaml python-dateutil
       # Check bash script syntax without executing it
       - name: Validate shell script syntax
         run: bash -n run_pipeline.sh
       # Check Python syntax across all pipeline scripts and DAGs
       - name: Validate Python syntax
         run: |
+          python -m py_compile common/*.py
           python -m py_compile ingestion/*.py
           python -m py_compile dags/*.py
           python -m py_compile tests/*.py
-      # Run data quality test suite against fixture data
+      # Run data quality test suite
       - name: Run pytest suite
-        run: pytest -v tests/test_gold_integrity.py
+        run: pytest -v tests/test_pipeline_integrity.py
