@@ -17,10 +17,13 @@ sys.path.insert(0, str(BASE_DIR))
 
 from common.file_config import (
     BRONZE_DIR,
+    GCP_PROJECT_ID,
+    GCS_BUCKET_NAME,
     INITIALISE_END_DATE,
     INITIALISE_START_DATE,
     config,
 )
+from google.cloud import storage
 
 WEATHER_CFG = config["weather"]
 BASE_URL = WEATHER_CFG["base_url"]
@@ -43,7 +46,14 @@ parser.add_argument(
     action="store_true",
     help="Re-download files even if they already exist locally",
 )
+parser.add_argument(
+    "--skip-gcs",
+    action="store_true",
+    help="Save locally only without uploading to GCS",
+)
 args = parser.parse_args()
+
+gcs_bucket = None if args.skip_gcs else storage.Client(project=GCP_PROJECT_ID).bucket(GCS_BUCKET_NAME)
 
 OUTPUT_DIR = BRONZE_DIR / "weather"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -127,6 +137,10 @@ for station in stations:
                 len(hourly_times),
                 file_path.name,
             )
+            if gcs_bucket is not None:
+                gcs_path = f"bronze/weather/{file_path.name}"
+                gcs_bucket.blob(gcs_path).upload_from_filename(str(file_path))
+                logging.info("Uploaded to gs://%s/%s", gcs_bucket.name, gcs_path)
     else:
         status = response.status_code if response is not None else "No response"
         text = response.text if response is not None else "Connection failed"

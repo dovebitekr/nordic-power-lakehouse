@@ -19,8 +19,15 @@ logging.basicConfig(
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from common.file_config import BRONZE_DIR, SILVER_DIR, config
+from common.file_config import (
+    BRONZE_DIR,
+    GCP_PROJECT_ID,
+    GCS_BUCKET_NAME,
+    SILVER_DIR,
+    config,
+)
 from common.schema import ENTSOE_PRICE_SCHEMA
+from google.cloud import storage
 
 bronze_dir = BRONZE_DIR / "entsoe/day_ahead_prices/FI"
 xml_files = sorted(bronze_dir.glob("*.xml"))
@@ -114,8 +121,16 @@ if row_count == 0:
 logging.info("Total price rows: %s", row_count)
 price_df.printSchema()
 
-# Save to Silver Parquet
-silver_out = str(SILVER_DIR / "entsoe" / config["entsoe"]["table_name"])
+# Save to Silver Parquet and upload to GCS
+silver_out_dir = SILVER_DIR / "entsoe" / config["entsoe"]["table_name"]
 partition_cols = config["entsoe"]["partition_cols"]
-price_df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(silver_out)
-logging.info("Successfully saved Silver price table to %s", silver_out)
+price_df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(str(silver_out_dir))
+logging.info("Successfully saved Silver price table to %s", silver_out_dir)
+
+gcs_bucket = storage.Client(project=GCP_PROJECT_ID).bucket(GCS_BUCKET_NAME)
+uploaded = 0
+for pq in sorted(silver_out_dir.rglob("*.parquet")):
+    rel = pq.relative_to(silver_out_dir).as_posix()
+    gcs_bucket.blob(f"silver/entsoe/{config['entsoe']['table_name']}/{rel}").upload_from_filename(str(pq))
+    uploaded += 1
+logging.info("Uploaded %s Silver price Parquet files to gs://%s/silver/entsoe/%s", uploaded, gcs_bucket.name, config["entsoe"]["table_name"])

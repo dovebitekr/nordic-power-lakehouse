@@ -8,8 +8,15 @@ import pyspark.sql.functions as F
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from common.file_config import BRONZE_DIR, SILVER_DIR, config
+from common.file_config import (
+    BRONZE_DIR,
+    GCP_PROJECT_ID,
+    GCS_BUCKET_NAME,
+    SILVER_DIR,
+    config,
+)
 from common.schema import WEATHER_SILVER_SCHEMA
+from google.cloud import storage
 
 os.environ["PYSPARK_PYTHON"] = sys.executable
 os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
@@ -118,7 +125,15 @@ if row_count == 0:
     logging.error("Silver weather dataset has zero records")
     sys.exit(1)
 
-out_path = str(SILVER_DIR / "weather" / config["weather"]["table_name"])
+out_dir = SILVER_DIR / "weather" / config["weather"]["table_name"]
 partition_cols = config["weather"]["partition_cols"]
-weather_silver_df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(out_path)
-logging.info("Saved %s Silver weather records to %s", row_count, out_path)
+weather_silver_df.coalesce(1).write.mode("overwrite").partitionBy(*partition_cols).format("parquet").save(str(out_dir))
+logging.info("Saved %s Silver weather records to %s", row_count, out_dir)
+
+gcs_bucket = storage.Client(project=GCP_PROJECT_ID).bucket(GCS_BUCKET_NAME)
+uploaded = 0
+for pq in sorted(out_dir.rglob("*.parquet")):
+    rel = pq.relative_to(out_dir).as_posix()
+    gcs_bucket.blob(f"silver/weather/{config['weather']['table_name']}/{rel}").upload_from_filename(str(pq))
+    uploaded += 1
+logging.info("Uploaded %s Silver weather Parquet files to gs://%s/silver/weather/%s", uploaded, gcs_bucket.name, config["weather"]["table_name"])

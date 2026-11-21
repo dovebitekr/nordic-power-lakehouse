@@ -21,10 +21,13 @@ sys.path.insert(0, str(BASE_DIR))
 
 from common.file_config import (
     BRONZE_DIR,
+    GCP_PROJECT_ID,
+    GCS_BUCKET_NAME,
     INITIALISE_END_DATE,
     INITIALISE_START_DATE,
     config,
 )
+from google.cloud import storage
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -52,7 +55,14 @@ parser.add_argument(
     action="store_true",
     help="Re-download files even if they already exist locally",
 )
+parser.add_argument(
+    "--skip-gcs",
+    action="store_true",
+    help="Save locally only without uploading to GCS",
+)
 args = parser.parse_args()
+
+gcs_bucket = None if args.skip_gcs else storage.Client(project=GCP_PROJECT_ID).bucket(GCS_BUCKET_NAME)
 
 out_dir = BRONZE_DIR / "entsoe/day_ahead_prices/FI"
 out_dir.mkdir(parents=True, exist_ok=True)
@@ -115,6 +125,10 @@ while current_start < global_end:
         else:
             out_path.write_bytes(r.content)
             logging.info("Saved payload to %s", file_name)
+            if gcs_bucket is not None:
+                gcs_path = f"bronze/entsoe/day_ahead_prices/{file_name}"
+                gcs_bucket.blob(gcs_path).upload_from_filename(str(out_path))
+                logging.info("Uploaded to gs://%s/%s", gcs_bucket.name, gcs_path)
     else:
         status = r.status_code if r is not None else "No response"
         logging.error("Failed request for %s to %s with status: %s", start_str, end_str, status)
