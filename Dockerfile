@@ -1,15 +1,14 @@
-FROM python:3.11-slim
+FROM apache/airflow:2.9.3-python3.11
+
+USER root
 
 # Install Java runtime required by PySpark
 RUN apt-get update && \
     apt-get install -y --no-install-recommends default-jre-headless && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+USER airflow
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["bash", "run_pipeline.sh"]
+COPY requirements.txt /opt/airflow/requirements.txt
+RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt

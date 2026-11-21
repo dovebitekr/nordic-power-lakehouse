@@ -26,6 +26,7 @@ AIRFLOW_HOME = os.environ.get("AIRFLOW_HOME", str(BASE_DIR))
 INITIALISE_START_DATE = os.getenv("INITIALISE_START_DATE", "2025-11-01")
 INITIALISE_END_DATE = os.getenv("INITIALISE_END_DATE", "2026-11-01")
 BATCH_LOOKBACK_DAYS = int(os.getenv("BATCH_LOOKBACK_DAYS", "2"))
+UNIT_PUBLICATION_LAG_DAYS = int(os.getenv("UNIT_PUBLICATION_LAG_DAYS", "5"))
 
 current_datetime = datetime.utcnow()
 batch_from_date = (current_datetime - relativedelta(days=BATCH_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
