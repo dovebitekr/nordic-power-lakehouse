@@ -1,173 +1,249 @@
-# Nordic Power Market Lakehouse (Finland)
+# Nordic Power Lakehouse — Finland Power Generation Analytics
 
-This project builds a batch data pipeline that collects Finnish electricity grid data from **Fingrid** and Day-Ahead wholesale spot prices from **ENTSO-E**, standardises them onto a 15-minute time grid using **PySpark**, validates data integrity with **pytest**, and loads the final dataset into **PostgreSQL**.
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![GCP](https://img.shields.io/badge/Google%20Cloud-GCS%20%7C%20BigQuery-4285F4?logo=googlecloud&logoColor=white)
+![PySpark](https://img.shields.io/badge/Apache%20Spark-PySpark-E25A1C?logo=apachespark&logoColor=white)
+![Airflow](https://img.shields.io/badge/Apache%20Airflow-2.9-017CEE?logo=apacheairflow&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-IaC-7B42BC?logo=terraform&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Looker Studio](https://img.shields.io/badge/Looker%20Studio-BI-4285F4?logo=looker&logoColor=white)
+![pytest](https://img.shields.io/badge/Data%20Quality-pytest%20CI-0A9EDC?logo=pytest&logoColor=white)
 
-To test whether the final Gold table is directly usable for downstream analysis, the repository also includes a simple **Battery Energy Storage System (BESS)** Day-Ahead arbitrage simulation notebook covering November 2025 to October 2026 (`35,040` quarter-hour intervals).
+An end-to-end batch data pipeline on **Google Cloud Platform (GCP)** that extracts, validates, models, and visualises 15-minute electricity generation data for **Finland (FI)**, enriched with day-ahead spot prices and weather telemetry.
+
+![System Architecture](media/architecture.png)
 
 ---
 
-## 1. Architecture & Tech Stack
+## Table of Contents
 
-```mermaid
-flowchart LR
-    subgraph Runtime ["Docker Compose Environment & Airflow Orchestration"]
-        A["External APIs\n(Fingrid JSON / ENTSO-E XML)"] --> B["Bronze Layer\n(Raw Monthly Files)"]
-        B --> C["Silver Layer\n(PySpark 15-min Parquet)"]
-        C --> D["Gold Layer\n(15-min Spine Parquet)"]
-        D --> E["Data Quality Audit\n(Pytest 7 Checks)"]
-        E --> F["Serving Database\n(PostgreSQL)"]
-    end
-    D --> G["Downstream Analysis\n(BESS Simulation)"]
-    H["GitHub Actions CI\n(Syntax & Pytest)"] -.-> E
-```
+1. [Project Description & Problem Statement](#1-project-description--problem-statement)
+2. [Data Sources](#2-data-sources)
+3. [Technologies & Project Structure](#3-technologies--project-structure)
+4. [Data Pipeline Design](#4-data-pipeline-design)
+5. [Storage and Data Warehouse](#5-storage-and-data-warehouse)
+6. [Data Visualisation](#6-data-visualisation)
+7. [How to Reproduce](#7-how-to-reproduce)
 
-| Layer / Role | Tool | Purpose in This Project |
+---
+
+## 1. Project Description & Problem Statement
+
+### Background & Motivation
+While studying for my Master's degree in Finland, I became interested in the Nordic energy sector and the many energy-tech companies operating here. Finland has an unusually dynamic power grid, combining nuclear baseload with rapidly growing wind power and 15-minute wholesale pricing that reacts sharply to winter weather. I built this project to explore real Finnish grid data while practicing end-to-end cloud data engineering on GCP.
+
+### Why This Project Started
+Understanding how a national power grid actually runs requires combining **individual power plant output**, **national fuel mix**, **estimated `CO₂` emissions**, **wholesale electricity prices**, and **weather**. However, public energy data in Finland is scattered across different sources with incompatible formats, time resolutions, and update rules, which makes it hard to query or analyse in one place.
+
+### The Core Problems Solved
+- **Scattered sources & mismatched formats**: ENTSO-E serves XML across separate endpoints (`A73` units, `A75` fuel mix, `A44` prices), while Open-Meteo serves hourly JSON weather that must be aligned to 15-minute UTC / Helsinki power intervals.
+- **Strict API limits & publication delays**: ENTSO-E `A73` enforces a **1-day maximum query window** (returning `HTTP 400` on longer ranges) and a **5-day publication delay (`D-5`)**, so naive daily batch jobs fail or pull empty files.
+- **Missing plant & carbon metadata**: Raw `A73` records only expose opaque `unit_mrid` codes with no city, region, coordinates, active status, or `CO₂` emission factor -> requiring curated, verified reference tables.
+- **Silent upstream schema changes**: New fuel codes (such as `B25` Energy Storage) can appear without notice and break downstream dashboards unless automated quality checks catch them first.
+
+### What This Pipeline Demonstrates
+Rather than loading a static CSV, this project focuses on practical batch pipeline habits:
+- **Terraform**: creates the GCS bucket and BigQuery dataset from code instead of manual console setup.
+- **Airflow in Docker**: schedules daily runs and handles real ENTSO-E API limits (1-day query cap and 5-day unit data lag).
+- **BigQuery `MERGE` & partitioning**: prevents duplicate rows on retries or backfills and keeps queries fast.
+- **`pytest` & GitHub Actions**: checks keys, non-negative values, and unit-vs-national totals automatically before dashboards read the data.
+
+---
+
+## 2. Data Sources
+
+| Dataset | Source | Frequency | How It Was Collected |
+| :--- | :--- | :--- | :--- |
+| **Actual Generation per Unit (`A73`)** | [ENTSO-E Transparency API](https://transparency.entsoe.eu/) | 15-min (`D-5` lag) | Pulled via Python REST client (`ingestion/entsoe_generation.py`) in 1-day XML chunks to respect ENTSO-E's `A73` query cap. |
+| **Actual Generation per Fuel Type (`A75`)** | [ENTSO-E Transparency API](https://transparency.entsoe.eu/) | 15-min | Pulled via Python REST client (`ingestion/entsoe_generation.py`) in 7-day XML chunks across 14 PSR fuel codes (`B01`–`B25`). |
+| **Day-Ahead Spot Prices (`A44`)** | [ENTSO-E Transparency API](https://transparency.entsoe.eu/) | 15-min / Hourly | Pulled via Python REST client (`ingestion/entsoe.py`) for the Finland (`FI`) bidding zone (`€/MWh`). |
+| **Historical Weather** | [Open-Meteo Archive API](https://open-meteo.com/) | Hourly → 15-min | Pulled via Python JSON API (`ingestion/weather.py`) for Helsinki (temperature) and Vaasa (coastal wind speed). |
+| **Static Reference Tables (`resources/`)** | Manually curated CSVs | Static | **Manually researched and cross-verified**: extracted all 32 `unit_mrid` keys from `A73`, verified capacities against ENTSO-E `A71`, manually mapped operators, active/retired status, 28 host cities, and 19 Finnish regions, and compiled `IPCC AR5` `carbon_g_per_kwh` emission factors for all 15 PSR fuel codes. |
+
+---
+
+## 3. Technologies & Project Structure
+
+### Tech Stack
+
+| Layer | Technology | Role |
 | :--- | :--- | :--- |
-| **Ingestion (Bronze)** | Python (`requests`, `dotenv`) | Fetch monthly Fingrid JSON and ENTSO-E XML files with retry backoff and local file caching |
-| **Transformation (Silver & Gold)** | Apache Spark (`PySpark`), Parquet | Standardise timestamps to UTC, align mixed time resolutions to 15 minutes, and join onto a continuous time spine |
-| **Data Quality Audit** | `pytest`, `pandas`, `numpy` | Verify row continuity, DST transitions, physical bounds, and null counts before database loading |
-| **Serving Database** | PostgreSQL (`SQLAlchemy`, `psycopg2`) | Store the verified Gold table (`power_market_15min`) with `start_time_utc` as the primary key |
-| **Workflow Orchestration** | Apache Airflow (`DAG`), Bash (`run_pipeline.sh`) | Define parallel Bronze/Silver task dependencies (`dags/nordic_power_dag.py`) and one-command local execution |
-| **Containerisation** | Docker (`Dockerfile`, `docker-compose.yml`) | Package Python 3.11, OpenJDK, PySpark, and a health-checked `postgres:16-alpine` database container |
-| **CI Validation** | GitHub Actions (`.github/workflows/ci.yml`) | Check shell/Python syntax and run the `pytest` suite against fixture data on every push |
-| **Downstream Analytics** | Jupyter, `scipy`, `matplotlib` | Compare rule-based BESS arbitrage against a linear programming (LP) upper bound |
+| **Infrastructure as Code** | Terraform | Provisions GCS bucket (`us-central1`), BigQuery dataset (`US`), and optional GCE VM (`start_up_script.sh`) |
+| **Data Lake** | Google Cloud Storage (GCS) | Stores raw JSON/XML (`bronze/`), reference CSVs (`resources/`), and cleaned Parquet (`silver/`) |
+| **Batch Processing** | Apache Spark (PySpark) | Enforces schemas, removes duplicates, converts MW → MWh, and aligns timestamps to 15-min UTC & Helsinki time |
+| **Data Quality & CI** | `pytest` & GitHub Actions | Runs 6 automated integrity and physical consistency checks on every push/PR |
+| **Data Warehouse** | Google BigQuery | Stores partitioned/clustered Star Schema tables via idempotent `MERGE` and 3 analytical views |
+| **Orchestration** | Apache Airflow 2.9 (Docker) | Runs two-track DAGs (one-time initialisation + daily incremental batch) |
+| **BI & Visualisation** | Looker Studio | Live dashboard connected directly to BigQuery 360 views |
 
----
-
-## 2. Key Engineering Challenges & How They Were Handled
-
-### 2.1 Aligning Mixed Time Resolutions (`3-min` and `60-min` to `15-min`)
-- **Issue**: Fingrid reports nuclear and hydro output every 3 minutes, while ENTSO-E XML files mix hourly (`PT60M`) and 15-minute (`PT15M`) price periods and omit `<Point>` tags whenever the price stays unchanged from the previous step. Fingrid wind sensors also record occasional small negative values during turbine self-consumption.
-- **Approach**:
-  - In `silver_entsoe.py`, omitted XML price points (`1,187` intervals across the year) are forward-filled within each period, and `PT60M` prices are expanded into four 15-minute intervals.
-  - In `silver_fingrid.py`, 3-minute series are downsampled to 15-minute averages, and negative generation readings (`73` wind records) are clamped to `0.0` MW and logged.
-
-### 2.2 Timezone Normalisation and Dynamic Daylight Saving Time (DST) Checks
-- **Issue**: In Finnish local time (`Europe/Helsinki`), Daylight Saving Time shifts make one spring day 23 hours long (`92` intervals) and one autumn day 25 hours long (`100` intervals), with repeated local `03:00–03:45` timestamps in October. Hardcoding specific DST dates breaks automated runs in future years.
-- **Approach**:
-  - All joins, sorting, and primary keys use **UTC (`start_time_utc`)**, which is strictly unique and free of DST jumps. Local Helsinki timestamps are derived via Spark's IANA timezone database (`from_utc_timestamp`).
-  - In `tests/test_gold_integrity.py`, instead of hardcoding calendar dates, `_last_sunday(year, month)` dynamically calculates the European Union DST transition rules (last Sunday of March = `92` rows, last Sunday of October = `100` rows, normal days = `96` rows) for any year present in the data.
-
-### 2.3 Spine Time-Grid Join and Bounded 1-Step Forward Fill
-- **Issue**: Joining tables directly on a single source table drops timestamps if that source has a missing record. Conversely, applying an unbounded forward fill silently hides multi-hour API outages.
-- **Approach**:
-  - `gold_power_balance_15min.py` first generates an independent 15-minute UTC sequence (`35,040` rows) as the base spine and left-joins all five Silver datasets onto it.
-  - Because electricity generation and consumption are continuous physical time series that do not change drastically over a single 15-minute step, isolated 1-step gaps (`1` interval in `wind_mw` and `1` in `consumption_mw`) are filled with the exact value from 15 minutes earlier (`rowsBetween(-1, 0)`), avoiding look-ahead bias.
-  - Every missing timestamp is logged as a `WARNING` before filling. If **two or more consecutive intervals (30+ minutes)** are missing, the second interval remains `NULL`, logs an `ERROR`, and causes `pytest` (`set -e`) to halt the pipeline before `load_postgres.py` runs.
-
----
-
-## 3. Data Model
-
-### 3.1 Silver Layer Schema (`data/silver/`)
-Each Silver table (`wind_generation`, `nuclear_generation`, `hydro_generation`, `total_consumption`, `day_ahead_price`) contains only standardised timestamps and its cleaned measurement:
-- `start_time_utc` (`timestamp`), `start_time_helsinki` (`timestamp`), `<metric_col>` (`double`), and `year` (`int`, partition key), plus `source_resolution` (`string`) in the ENTSO-E price table.
-
-### 3.2 Gold Layer & PostgreSQL Schema (`power_market_15min`)
-Redundant intermediate fields (such as raw day-of-week integers or unpartitioned month numbers) were removed so that every column in the Gold table has a clear analytical or structural role:
-
-| Column | Type | Why It Exists |
-| :--- | :--- | :--- |
-| `start_time_utc` | `timestamp` | **Primary Key**. Continuous 15-minute UTC spine timestamp with no DST duplicates |
-| `start_time_helsinki` | `timestamp` | Local Finnish timestamp (`Europe/Helsinki`) for local time-of-day analysis and plotting |
-| `date_start_helsinki` | `date` | Local calendar date used to verify daily interval counts (`92` / `96` / `100`) across DST shifts |
-| `year` | `int` | Partition key (`partitionBy("year")`) used to organise Parquet files without small-file fragmentation |
-| `is_weekend` | `boolean` | Flags Saturday and Sunday in local time (`True`/`False`) without Spark vs. Pandas weekday numbering confusion |
-| `is_peak_hour` | `boolean` | Flags weekday daytime hours (`08:00–20:00` Helsinki time) for peak vs. off-peak price comparisons |
-| `wind_mw` | `double` | Domestic wind power generation (`MW`) |
-| `nuclear_mw` | `double` | Domestic nuclear baseload generation (`MW`) |
-| `hydro_mw` | `double` | Domestic hydroelectric generation (`MW`) |
-| `consumption_mw` | `double` | Total electricity consumption in Finland (`MW`) |
-| `price_eur_per_mwh` | `double` | ENTSO-E Day-Ahead wholesale spot price (`EUR/MWh`) |
-| `selected_generation_mw` | `double` | Sum of the three ingested generation sources (`wind_mw + nuclear_mw + hydro_mw`) |
-| `selected_gen_balance_mw` | `double` | Supply gap between the three ingested sources and total demand (`selected_generation_mw - consumption_mw`) |
-| `wind_share_selected_ratio` | `double` | Wind share (`0.0–1.0`) within `selected_generation_mw`, used to analyse wind price cannibalisation |
-
----
-
-## 4. Downstream Use Case: BESS Arbitrage Simulation
-
-Notebook: [`notebooks/bess_simulation.ipynb`](notebooks/bess_simulation.ipynb) (`10 MWh` capacity, `5 MW` power rating, `90.25%` round-trip efficiency, `10%–90%` usable SoC window).
-
-### Key Findings from the 1-Year Gold Dataset
-1. **Wind Oversupply & Negative Prices**:
-   - When wind accounts for `>= 50%` of selected generation, the average spot price drops to **`12.40 EUR/MWh`**, compared to **`93.27 EUR/MWh`** when wind share is `< 20%`.
-   - Negative or zero prices (`<= 0 EUR/MWh`) occurred in **`321` intervals (`0.9%` of the year)**.
-2. **Rule-Based Dispatch vs. LP Benchmark**:
-   - Targeting the **8 cheapest** and **8 most expensive** 15-minute slots per CET delivery day yields **`141,223.33 EUR`** in annual revenue (`1,904` charge steps, `1,884` discharge steps).
-   - A full-year Linear Programming (LP) benchmark with negative-price discharge blocking achieves **`261,258.10 EUR`**, giving the simple daily rule a **`54.1%` capture rate**.
-3. **Why Winter vs. Summer Revenue Varies Sharply (`22,525.58 EUR` in Feb vs. `3,121.57 EUR` in Jul)**:
-   - **Winter**: High electric heating demand combined with calm, freezing weather forces reliance on expensive peak generation and imports (pushing daytime prices above `100–300 EUR/MWh`), while windy hours drop near zero. This creates large daily spreads for battery cycling.
-   - **Summer**: Heating demand disappears while nuclear baseload and Nordic hydro keep prices low and flat throughout the day. Daily price spreads often fail to exceed the battery's `9.75%` round-trip heat loss plus minimum margin.
-4. **Why Standalone Day-Ahead BESS Arbitrage is Harder in Finland than in Central Europe**:
-   - In solar-heavy markets such as Germany, solar PV creates a regular 24-hour "duck curve" (predictable midday price drops and evening peaks almost every day), which suits a 2-hour battery well.
-   - Finland's renewable output is dominated by **wind** rather than solar. Wind follows irregular **multi-day weather systems**—blowing continuously for several days (keeping prices flat near zero) or staying calm for days. Because a 2-hour (`10 MWh`) battery cannot store energy from Tuesday to sell on Friday, real BESS projects in Finland typically rely on Fingrid frequency containment and balancing reserves (**FCR-N, FCR-D, mFRR**) rather than Day-Ahead price arbitrage alone.
-
----
-
-## 5. Limitations & Future Improvements
-
-1. **Incomplete Generation Mix (API Scope)**:
-   - This pipeline collects Finland's three main non-fossil generation sources (`wind`, `nuclear`, `hydro`). It does **not** include solar PV, combined heat and power (CHP / biomass), thermal peat/gas, or cross-border net import/export series because consistent 15-minute datasets were not all available in the same scope. For this reason, the summed column is named `selected_generation_mw` rather than total generation.
-2. **Full-Refresh Batch Overwrites**:
-   - While Bronze ingestion skips already-downloaded monthly files, the Silver, Gold, and PostgreSQL steps currently overwrite the target tables on each run (`mode("overwrite")` / `if_exists="replace"`). A production extension would replace this with date-partitioned incremental merges (`Delta Lake MERGE` or PostgreSQL `ON CONFLICT DO UPDATE`).
-3. **Simplified BESS Revenue Assumptions**:
-   - The simulation evaluates Day-Ahead spot arbitrage under known day-ahead prices (published the afternoon before) and does not model battery cell degradation, grid fees, or reserve market revenue stacking.
-
----
-
-## 6. Project Structure & How to Run
+### Project Structure
 
 ```text
-nordic-power-lakehouse/
-├── .github/workflows/ci.yml          # GitHub Actions syntax & pytest CI workflow
-├── dags/nordic_power_dag.py          # Apache Airflow DAG definition
-├── ingestion/
-│   ├── fingrid.py                    # Bronze: Fingrid REST API client (JSON)
-│   ├── entsoe.py                     # Bronze: ENTSO-E API client (XML)
-│   ├── silver_fingrid.py             # Silver: PySpark standardisation & resampling
-│   ├── silver_entsoe.py              # Silver: XML curve decompression & 15-min expansion
-│   ├── gold_power_balance_15min.py   # Gold: 15-min spine join & 1-step forward fill
-│   └── load_postgres.py              # Serving: Load verified Gold table into PostgreSQL
-├── notebooks/
-│   └── bess_simulation.ipynb         # Downstream BESS arbitrage simulation & plots
-├── tests/
-│   └── test_gold_integrity.py        # 7 automated pytest data quality checks
-├── .env.example                      # Template for API keys and PostgreSQL settings
-├── Dockerfile                        # Python + OpenJDK + PySpark container image
-├── docker-compose.yml                # Multi-container setup (PostgreSQL + Pipeline)
-├── requirements.txt                  # Python package dependencies
-└── run_pipeline.sh                   # End-to-end execution script (Bronze -> Postgres)
+.
+├── .github/workflows/ci.yml           # GitHub Actions pytest CI
+├── Dockerfile                         # Airflow 2.9 + Java + PySpark
+├── docker-compose.yml                 # Local Airflow stack
+├── requirements.txt
+├── run_pipeline.sh                    # Local Bronze → Silver → pytest → Gold runner
+├── start_up_script.sh                 # Optional GCE VM setup script
+├── terraform/                         # GCS bucket, BigQuery dataset & optional VM
+├── common/                            # Config, schemas, paths, BigQuery SQL & MERGE
+├── ingestion/                         # Bronze API scripts, Silver PySpark ETL, BigQuery loader
+├── dags/                              # etl_initialise_data.py & etl_batch_ingest_data.py
+├── resources/                         # 4 manually curated Dimension CSVs
+├── media/                             # Architecture, Airflow, GCP & dashboard visuals
+└── tests/
+    └── test_pipeline_integrity.py     # 6 automated data quality tests
 ```
-
-### Option A: Run Everything with Docker Compose
-1. Copy `.env.example` to `.env` and fill in `FINGRID_API_KEY` and `ENTSOE_API_KEY`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Build and run the PostgreSQL database and pipeline containers:
-   ```bash
-   docker compose up --build
-   ```
-
-### Option B: Run Locally with Conda + Docker PostgreSQL
-1. Install dependencies and start the PostgreSQL container in the background:
-   ```bash
-   pip install -r requirements.txt
-   docker compose up -d db
-   ```
-2. Run the full pipeline (`Bronze -> Silver -> Gold -> pytest -> PostgreSQL`):
-   ```bash
-   ./run_pipeline.sh
-   ```
-3. Verify the loaded table inside PostgreSQL:
-   ```bash
-   docker exec -it nordic_postgres psql -U lakehouse -d nordic_power -c "SELECT start_time_utc, wind_mw, consumption_mw, price_eur_per_mwh FROM power_market_15min LIMIT 5;"
-   ```
 
 ---
 
-## 7. Data Sources & Attribution
+## 4. Data Pipeline Design
 
-- **Fingrid Open Data**: Wind, nuclear, hydro generation, and total electricity consumption in Finland. Licensed under [CC BY 4.0](https://www.fingrid.fi/en/grid/data-hub/open-data/).
-- **ENTSO-E Transparency Platform**: Day-Ahead wholesale electricity prices (`A44`) for the Finland bidding zone (`10YFI-1--------U`).
+The pipeline is split into two Airflow DAGs running in Docker (`dags/`):
+
+### 4.1 Initialisation Data Ingestion (`etl_initialise_data` — `@once`)
+One-time setup DAG that bootstraps the lakehouse:
+1. Extracts initial historical Bronze data for ENTSO-E (`A73`, `A75`, `A44`) and Open-Meteo weather into GCS.
+2. Runs PySpark Silver transformations to produce cleaned, partitioned Parquet files.
+3. Loads the 4 curated Dimension CSVs (`resources/`) and generates `dim_datetime`.
+4. Creates BigQuery Fact tables, merges initial Silver records, and deploys the 3 analytical 360 views.
+
+### 4.2 Incremental Batch Ingestion (`etl_batch_ingest_data` — `0 6 * * *`)
+Daily batch DAG running at 06:00 UTC:
+1. **Weather, Spot Price & National Fuel Mix (`D-2` to `D`)**: Fetches recent 2-day lookback windows to capture late updates.
+2. **Unit-Level Generation (`A73`, `D-7` to `D-5`)**: Uses a 5-day offset (`UNIT_PUBLICATION_LAG_DAYS = 5`) and 1-day chunking (`max_chunk_days: 1`) to handle ENTSO-E `A73` API limits cleanly.
+3. **PySpark Silver → BigQuery `MERGE`**: Transforms each batch to Parquet and runs idempotent SQL `MERGE` into BigQuery so reruns never create duplicates.
+
+![Airflow Batch DAG Success](media/airflow_dag_success.png)
+
+### 4.3 Data Quality Gate (`pytest` + GitHub Actions CI)
+`tests/test_pipeline_integrity.py` runs 6 automated checks locally and via `.github/workflows/ci.yml`:
+1. Primary key uniqueness across all static Dimension CSVs.
+2. 100% foreign key match (`unit_mrid`, `entsoe_psr_code`, `city`, `region`).
+3. Non-negative values and zero duplicate rows in Silver unit Parquet.
+4. Non-negative values and valid PSR fuel codes in Silver fuel Parquet (automatically caught newly reported `B25` Energy Storage in Finland).
+5. Schema and range validation on weather and spot price Parquet.
+6. **Physical cross-check**: `B14` Nuclear relative difference between `A73` (unit sum) and `A75` (national) `< 1%`, and `SUM(A73) <= SUM(A75)`.
+
+---
+
+## 5. Storage and Data Warehouse
+
+### 5.1 Google Cloud Storage (Data Lake)
+Bucket: `gs://nordic-power-lakehouse-fi-data` (`us-central1`)
+
+```text
+gs://nordic-power-lakehouse-fi-data/
+├── bronze/
+│   ├── entsoe/
+│   │   ├── unit_generation/     # Raw XML (A73 power units)
+│   │   ├── fuel_generation/     # Raw XML (A75 national fuel mix)
+│   │   └── day_ahead_price/     # Raw XML (A44 spot prices)
+│   └── weather/                 # Raw JSON (Open-Meteo Helsinki & Vaasa)
+├── resources/                   # Static reference seed CSVs
+└── silver/
+    ├── entsoe/
+    │   ├── unit_generation/     # Partitioned Parquet (15-min per unit)
+    │   ├── fuel_generation/     # Partitioned Parquet (15-min per PSR code)
+    │   └── day_ahead_price/     # Partitioned Parquet (15-min FI prices)
+    └── weather/
+        └── finnish_weather/     # Partitioned Parquet (year=2025, year=2026)
+```
+
+![GCS Data Lake Structure](media/gcs_bucket.jpg)
+
+### 5.2 Google BigQuery (Data Warehouse)
+Dataset: `nordic_power_analytics` (`US`). All Fact tables are **date-partitioned** (`date_start_helsinki`) and **clustered** for low-cost queries, and updated via **staging tables + SQL `MERGE`**.
+
+![BigQuery Dataset Tables and Views](media/bigquery_tables.jpg)
+
+| Type | Table / View | Description |
+| :--- | :--- | :--- |
+| **Fact** | `fct_unit_generation_15min` | 15-min generation per power unit (`unit_mrid`, `generation_mw`, `generation_mwh`) |
+| **Fact** | `fct_fuel_generation_15min` | 15-min national generation per PSR fuel code (`entsoe_psr_code`, `generation_mwh`) |
+| **Fact** | `fct_day_ahead_price_15min` | Finland day-ahead wholesale price (`price_eur_per_mwh`) |
+| **Fact** | `fct_weather_15min` | Helsinki temperature (`temp_c`) & Vaasa wind speed (`wind_speed_ms`) |
+| **Dim** | `dim_power_unit` | 32 Finnish units (`≥ 100 MW`) with capacity, operator, city, region, coordinates, active flag |
+| **Dim** | `dim_fuel_type` | 15 ENTSO-E PSR codes mapped to categories (`Nuclear`, `Clean`, `Fossil`, `Other`) + `carbon_g_per_kwh` |
+| **Dim** | `dim_fi_city` | 28 Finnish municipalities with coordinates |
+| **Dim** | `dim_fi_region` | 19 Finnish regions (English & Finnish names + centroids) |
+| **Dim** | `dim_datetime` | 15-min UTC & `Europe/Helsinki` calendar (`hour_helsinki`, `is_peak_hour`, `is_weekend`, `season`) |
+| **View** | `vw_unit_generation_360` | Unit output + location + capacity factor + estimated `CO₂` |
+| **View** | `vw_fuel_generation_360` | National fuel mix + estimated `CO₂` + spot price + weather |
+| **View** | `vw_regional_generation_summary` | Regional roll-up of generation and estimated `CO₂` |
+
+Full table DDL and view SQL are in [`common/bq_queries.py`](common/bq_queries.py).
+
+---
+
+## 6. Data Visualisation
+
+The Looker Studio dashboard connects directly to `vw_unit_generation_360` and `vw_fuel_generation_360` in BigQuery.
+
+![Looker Studio Dashboard](media/looker_studio_dashboard.png)
+
+Key metrics from the loaded **Nov 2025 – Jan 2026** winter dataset (92 days):
+- **23.7M MWh** total national generation and **2.2M t** estimated `CO₂` (~93 gCO₂/kWh average carbon intensity).
+- **Nuclear Baseload**: `Olkiluoto 3 B3`, `Olkiluoto 1 B1`, `Olkiluoto 2 B2`, and `Loviisa 2 G22` lead total winter output with high capacity factors.
+- **Market & Weather Context**: Average spot price was **68.6 €/MWh** at **4.4 m/s** average Vaasa wind speed, with low-wind cold spells (e.g. late Jan 2026) pushing prices above **200 €/MWh**.
+
+---
+
+## 7. How to Reproduce
+
+### 7.1 Prerequisites
+1. **Google Cloud Platform (GCP)** account and project:
+   - Enable **Cloud Storage** and **BigQuery** APIs.
+   - Authenticate either via a Service Account JSON key (`Storage Admin` & `BigQuery Admin` roles) or Application Default Credentials (`gcloud auth application-default login`).
+2. **ENTSO-E Transparency Platform API Token**:
+   - Register for a free account at [transparency.entsoe.eu](https://transparency.entsoe.eu/) and request a Security Token.
+3. **Local Tools**:
+   - [Docker & Docker Compose](https://www.docker.com/)
+   - [Terraform](https://developer.hashicorp.com/terraform/downloads) (`>= 1.5`)
+   - Python `3.11` & Java `17` (only needed if running PySpark outside Docker)
+
+### 7.2 Provision GCP Infrastructure (Terraform)
+```bash
+cd terraform
+terraform init
+terraform apply \
+  -var="project=YOUR_GCP_PROJECT_ID" \
+  -var="gcs_bucket_name=YOUR_UNIQUE_BUCKET_NAME"
+```
+*(By default `create_vm = false` to stay within GCP Always Free Tier. Pass `-var="create_vm=true"` to also create a GCE VM bootstrapped with `start_up_script.sh`.)*
+
+### 7.3 Configure Environment Variables
+```bash
+cp .env.example .env
+```
+Update `.env` with your values:
+```env
+ENTSOE_API_KEY=your_entsoe_security_token
+GCP_PROJECT_ID=your_gcp_project_id
+GCS_BUCKET_NAME=your_unique_gcs_bucket_name
+BQ_DATASET_NAME=nordic_power_analytics
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/gcp-credentials.json
+GCP_CREDENTIALS_PATH=/path/to/gcp-credentials.json
+```
+
+### 7.4 Run the Pipeline
+
+**Option A — Containerised Apache Airflow (Recommended)**
+```bash
+docker compose up -d --build
+```
+Open **`http://localhost:8080`** (`airflow` / `airflow`):
+1. Trigger **`etl_initialise_data`** once to load Dimensions, initial data (`2025-11-01` to `2025-11-04` by default), and 360 Views.
+2. Unpause **`etl_batch_ingest_data`** for automated daily 06:00 UTC incremental runs.
+
+**Option B — Local CLI & Quality Gate**
+```bash
+pip install -r requirements.txt
+set -a && source .env && set +a
+./run_pipeline.sh
+```
+Run the automated integrity test suite directly at any time:
+```bash
+pytest -v
+```
