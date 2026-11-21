@@ -71,8 +71,8 @@ Rather than loading a static CSV, this project focuses on practical batch pipeli
 | :--- | :--- | :--- |
 | **Infrastructure as Code** | Terraform | Provisions GCS bucket (`us-central1`), BigQuery dataset (`US`), and optional GCE VM (`start_up_script.sh`) |
 | **Data Lake** | Google Cloud Storage (GCS) | Stores raw JSON/XML (`bronze/`), reference CSVs (`resources/`), and cleaned Parquet (`silver/`) |
-| **Batch Processing** | Apache Spark (PySpark) | Enforces schemas, removes duplicates, converts MW → MWh, and aligns timestamps to 15-min UTC & Helsinki time |
-| **Data Quality & CI** | `pytest` & GitHub Actions | Runs 6 automated integrity and physical consistency checks on every push/PR |
+| **Batch Processing** | Apache Spark (PySpark) | Enforces schemas, removes duplicates, and aligns timestamps to 15-min UTC & Helsinki time |
+| **Data Quality & CI** | `pytest` & GitHub Actions | Runs automated integrity checks (static/SQL checks on every push/PR in CI + Silver/physical cross-checks locally) |
 | **Data Warehouse** | Google BigQuery | Stores partitioned/clustered Star Schema tables via idempotent `MERGE` and 3 analytical views |
 | **Orchestration** | Apache Airflow 2.9 (Docker) | Runs two-track DAGs (one-time initialisation + daily incremental batch) |
 | **BI & Visualisation** | Looker Studio | Live dashboard connected directly to BigQuery 360 views |
@@ -119,7 +119,7 @@ Daily batch DAG running at 06:00 UTC:
 ![Airflow Batch DAG Success](media/airflow_dag_success.png)
 
 ### 4.3 Data Quality Gate (`pytest` + GitHub Actions CI)
-`tests/test_pipeline_integrity.py` runs 6 automated checks locally and via `.github/workflows/ci.yml`:
+`tests/test_pipeline_integrity.py` runs 6 automated checks (static/config/SQL checks run on every push/PR in `.github/workflows/ci.yml`; Silver Parquet and physical cross-checks run locally where `data/silver/` is present):
 1. Primary key uniqueness across all static Dimension CSVs.
 2. 100% foreign key match (`unit_mrid`, `entsoe_psr_code`, `city`, `region`).
 3. Non-negative values and zero duplicate rows in Silver unit Parquet.
@@ -155,14 +155,14 @@ gs://nordic-power-lakehouse-fi-data/
 ![GCS Data Lake Structure](media/gcs_bucket.jpg)
 
 ### 5.2 Google BigQuery (Data Warehouse)
-Dataset: `nordic_power_analytics` (`US`). All Fact tables are **date-partitioned** (`date_start_helsinki`) and **clustered** for low-cost queries, and updated via **staging tables + SQL `MERGE`**.
+Dataset: `nordic_power_analytics` (`US`). All Fact tables are **date-partitioned** (`DATE(start_time_utc)`) and updated via **staging tables + SQL `MERGE`**.
 
 ![BigQuery Dataset Tables and Views](media/bigquery_tables.jpg)
 
 | Type | Table / View | Description |
 | :--- | :--- | :--- |
-| **Fact** | `fct_unit_generation_15min` | 15-min generation per power unit (`unit_mrid`, `generation_mw`, `generation_mwh`) |
-| **Fact** | `fct_fuel_generation_15min` | 15-min national generation per PSR fuel code (`entsoe_psr_code`, `generation_mwh`) |
+| **Fact** | `fct_unit_generation_15min` | 15-min generation per power unit (`start_time_utc`, `unit_mrid`, `generation_mw`) |
+| **Fact** | `fct_fuel_generation_15min` | 15-min national generation per PSR fuel code (`start_time_utc`, `entsoe_psr_code`, `generation_mw`) |
 | **Fact** | `fct_day_ahead_price_15min` | Finland day-ahead wholesale price (`price_eur_per_mwh`) |
 | **Fact** | `fct_weather_15min` | Helsinki temperature (`temp_c`) & Vaasa wind speed (`wind_speed_ms`) |
 | **Dim** | `dim_power_unit` | 32 Finnish units (`≥ 100 MW`) with capacity, operator, city, region, coordinates, active flag |
@@ -170,9 +170,9 @@ Dataset: `nordic_power_analytics` (`US`). All Fact tables are **date-partitioned
 | **Dim** | `dim_fi_city` | 28 Finnish municipalities with coordinates |
 | **Dim** | `dim_fi_region` | 19 Finnish regions (English & Finnish names + centroids) |
 | **Dim** | `dim_datetime` | 15-min UTC & `Europe/Helsinki` calendar (`hour_helsinki`, `is_peak_hour`, `is_weekend`, `season`) |
-| **View** | `vw_unit_generation_360` | Unit output + location + capacity factor + estimated `CO₂` |
-| **View** | `vw_fuel_generation_360` | National fuel mix + estimated `CO₂` + spot price + weather |
-| **View** | `vw_regional_generation_summary` | Regional roll-up of generation and estimated `CO₂` |
+| **View** | `vw_unit_generation_360` | Active unit output + `generation_mwh` (`MW * 0.25`) + location + capacity factor + estimated `CO₂` |
+| **View** | `vw_fuel_generation_360` | National fuel mix + `generation_mwh` (`MW * 0.25`) + estimated `CO₂` + spot price + weather |
+| **View** | `vw_regional_generation_summary` | Regional roll-up of generation (`MWh`) and estimated `CO₂` |
 
 Full table DDL and view SQL are in [`common/bq_queries.py`](common/bq_queries.py).
 
