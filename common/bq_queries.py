@@ -24,7 +24,7 @@ def bq_table(table_name: str) -> str:
     return f"`{GCP_PROJECT_ID}.{BQ_DATASET_NAME}.{table_name}`"
 
 
-# 1. Partitioned & Clustered Fact/Time Table DDL (BigQuery OLAP optimisation)
+# Partitioned and clustered Fact/Time table DDL
 CREATE_FACT_TABLES_SQL = [
     f"""
     CREATE TABLE IF NOT EXISTS {bq_table(dim_datetime_table_name)} (
@@ -78,7 +78,7 @@ CREATE_FACT_TABLES_SQL = [
 ]
 
 
-# 2. Idempotent MERGE Upsert Queries (Staging -> Production Fact/Dim Tables)
+# Idempotent MERGE upsert queries
 MERGE_DIM_DATETIME_SQL = f"""
 MERGE {bq_table(dim_datetime_table_name)} T
 USING {bq_table("stg_dim_datetime")} S
@@ -158,9 +158,9 @@ WHEN NOT MATCHED THEN
 """
 
 
-# 3. Multi-Dimensional 360 Analytical Views (Looker Studio & BI Ready)
+# Multi-dimensional 360 analytical views
 CREATE_ANALYTICAL_VIEWS_SQL = [
-    # View 1: Unit-level 360 View (6-table star schema JOIN + price & weather)
+    # Unit-level 360 view
     f"""
     CREATE OR REPLACE VIEW {bq_table(vw_unit_generation_360_name)} AS
     SELECT
@@ -213,7 +213,7 @@ CREATE_ANALYTICAL_VIEWS_SQL = [
         ON f.start_time_utc = w.start_time_utc
     WHERE u.is_active = TRUE
     """,
-    # View 2: National Fuel-Mix 360 View (ENTSO-E A75 x Fuel Type x Datetime x Price x Weather)
+    # National fuel-mix 360 view
     f"""
     CREATE OR REPLACE VIEW {bq_table(vw_fuel_generation_360_name)} AS
     SELECT
@@ -249,7 +249,7 @@ CREATE_ANALYTICAL_VIEWS_SQL = [
     LEFT JOIN {bq_table(fct_weather_table_name)} w
         ON f.start_time_utc = w.start_time_utc
     """,
-    # View 3: Regional Generation & Capacity Summary with Window Function Ranking
+    # Regional generation summary view with window function ranking
     f"""
     CREATE OR REPLACE VIEW {bq_table(vw_regional_generation_summary_name)} AS
     SELECT

@@ -31,7 +31,7 @@ with DAG(
     tags=["initialise", "gcp", "bigquery", "entsoe"],
 ) as dag:
 
-    # 1. Bronze Layer: Parallel API extraction & GCS upload
+    # Bronze extraction and GCS upload tasks
     bronze_entsoe_generation = BashOperator(
         task_id="bronze_entsoe_generation",
         bash_command=(
@@ -56,7 +56,7 @@ with DAG(
         ),
     )
 
-    # 2. Silver Layer: Parallel PySpark schema-enforced Parquet transformations
+    # Silver PySpark transformation tasks
     silver_entsoe_generation = BashOperator(
         task_id="silver_entsoe_generation",
         bash_command=f"cd {BASE_DIR} && python ingestion/silver_entsoe_generation.py",
@@ -72,7 +72,7 @@ with DAG(
         bash_command=f"cd {BASE_DIR} && python ingestion/silver_weather.py",
     )
 
-    # 3. Warehouse Layer: Seed GCS Dimensions, MERGE Facts, and create BigQuery 360 Views
+    # BigQuery warehouse initialisation task
     load_bigquery_initialise = BashOperator(
         task_id="load_bigquery_initialise",
         bash_command=f"cd {BASE_DIR} && python ingestion/load_bigquery.py",

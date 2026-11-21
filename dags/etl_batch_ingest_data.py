@@ -33,7 +33,7 @@ with DAG(
 
     lookback_start = f"{{{{ macros.ds_add(ds, -{BATCH_LOOKBACK_DAYS}) }}}}"
 
-    # 1. Bronze Layer: Rolling lookback incremental API fetch
+    # Rolling lookback Bronze extraction tasks
     batch_bronze_entsoe_generation = BashOperator(
         task_id="batch_bronze_entsoe_generation",
         bash_command=(
@@ -58,7 +58,7 @@ with DAG(
         ),
     )
 
-    # 2. Silver Layer: PySpark schema-enforced transformations
+    # Silver PySpark transformation tasks
     batch_silver_entsoe_generation = BashOperator(
         task_id="batch_silver_entsoe_generation",
         bash_command=f"cd {BASE_DIR} && python ingestion/silver_entsoe_generation.py",
@@ -74,7 +74,7 @@ with DAG(
         bash_command=f"cd {BASE_DIR} && python ingestion/silver_weather.py",
     )
 
-    # 3. Warehouse Layer: Idempotent BigQuery MERGE Upsert
+    # BigQuery idempotent MERGE task
     batch_merge_bigquery = BashOperator(
         task_id="batch_merge_bigquery",
         bash_command=f"cd {BASE_DIR} && python ingestion/load_bigquery.py",

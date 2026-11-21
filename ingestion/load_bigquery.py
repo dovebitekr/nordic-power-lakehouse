@@ -119,15 +119,15 @@ def main() -> None:
     gcs_client = storage.Client(project=GCP_PROJECT_ID)
     gcs_bucket = gcs_client.bucket(GCS_BUCKET_NAME)
 
-    # 1. Seed Dimension tables from resources/ via GCS
+    # Seed dimension tables from resources via GCS
     load_dimensions_via_gcs(bq_client, gcs_bucket)
 
-    # 2. Ensure Partitioned & Clustered Fact/Time tables exist
+    # Ensure partitioned and clustered fact tables exist
     for ddl in CREATE_FACT_TABLES_SQL:
         bq_client.query(ddl, location=BQ_LOCATION).result()
     logging.info("Verified %s partitioned/clustered BigQuery tables", len(CREATE_FACT_TABLES_SQL))
 
-    # 3. Read available Silver Parquet tables
+    # Read available Silver Parquet tables
     fact_jobs = [
         (
             SILVER_DIR / "entsoe" / config["entsoe"]["datasets"]["unit_generation"]["table_name"],
@@ -170,7 +170,7 @@ def main() -> None:
         logging.error("No Silver Parquet datasets found to load into BigQuery")
         sys.exit(1)
 
-    # 4. Merge dim_datetime first, then merge all Fact tables
+    # Merge dim_datetime first, then merge all fact tables
     dim_dt_df = build_dim_datetime_df(utc_series_list)
     dim_dt_schema = [
         bigquery.SchemaField("start_time_utc", "TIMESTAMP"),
@@ -188,12 +188,12 @@ def main() -> None:
     for df, stg_name, merge_sql in loaded_dfs:
         stage_and_merge(bq_client, df, stg_name, merge_sql)
 
-    # 5. Create Multi-Dimensional 360 Analytical Views
+    # Create multi-dimensional 360 analytical views
     for view_sql in CREATE_ANALYTICAL_VIEWS_SQL:
         bq_client.query(view_sql, location=BQ_LOCATION).result()
     logging.info("Created %s BigQuery 360 analytical views", len(CREATE_ANALYTICAL_VIEWS_SQL))
 
-    # 6. Post-load verification query on vw_unit_generation_360 & vw_fuel_generation_360
+    # Post-load verification query on 360 views
     verify_sql = f"""
     SELECT
         unit_name,

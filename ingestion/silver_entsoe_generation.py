@@ -145,7 +145,7 @@ def main() -> None:
     gcs_client = storage.Client(project=GCP_PROJECT_ID)
     gcs_bucket = gcs_client.bucket(GCS_BUCKET_NAME)
 
-    # 1. Process A73 Unit-Level Generation
+    # Process A73 unit-level generation
     a73_bronze = BRONZE_DIR / "entsoe/unit_generation"
     a73_files = sorted(a73_bronze.glob("*.xml"))
     if a73_files:
@@ -167,7 +167,7 @@ def main() -> None:
     else:
         logging.warning("No A73 XML files found in %s", a73_bronze)
 
-    # 2. Process A75 Fuel-Type Generation
+    # Process A75 fuel-type generation
     a75_bronze = BRONZE_DIR / "entsoe/fuel_generation"
     a75_files = sorted(a75_bronze.glob("*.xml"))
     if a75_files:
